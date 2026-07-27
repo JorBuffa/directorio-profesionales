@@ -1,0 +1,41 @@
+import { Routes, Route } from "react-router-dom";
+import Navbar from "./components/Navbar.jsx";
+import Footer from "./components/Footer.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
+
+import Home from "./pages/Home.jsx";
+import Buscar from "./pages/Buscar.jsx";
+import SoyProfesional from "./pages/SoyProfesional.jsx";
+import MiPerfil from "./pages/MiPerfil.jsx";
+import EditarPerfil from "./pages/EditarPerfil.jsx";
+import AdminLogin from "./pages/AdminLogin.jsx";
+import Admin from "./pages/Admin.jsx";
+import NotFound from "./pages/NotFound.jsx";
+
+export default function App() {
+  return (
+    <div className="flex min-h-screen flex-col bg-paper">
+      <Navbar />
+      <main className="flex-1">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/buscar" element={<Buscar />} />
+          <Route path="/soy-profesional" element={<SoyProfesional />} />
+          <Route path="/mi-perfil" element={<MiPerfil />} />
+          <Route path="/editar-perfil" element={<EditarPerfil />} />
+          <Route path="/admin-login" element={<AdminLogin />} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute role="admin">
+                <Admin />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
+      <Footer />
+    </div>
+  );
+}
