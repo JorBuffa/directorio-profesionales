@@ -3,13 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../api/supabaseClient.js";
 import MapView from "../components/MapView.jsx";
 
-// Diccionario inteligente para interpretar problemas cotidianos (Ej: "canilla" -> "plomero")
+// Diccionario inteligente ampliado para interpretar problemas cotidianos (incluyendo tecnología e informática)
 const diccionarioRubros = {
   plomero: ["canilla", "agua", "fuga", "pérdida", "inodoro", "tubo", "caño", "desagüe", "gotera", "tanque", "bomba", "plomeria"],
   gasista: ["gas", "estufa", "calefón", "termotanque", "cocina", "fuga de gas", "valvula", "medidor"],
   electricista: ["luz", "corto", "enchufes", "foco", "térmica", "disyuntor", "cable", "apagón", "electricidad", "toma", "corriente"],
   albanil: ["pared", "humedad", "piso", "techo", "revoque", "ladrillo", "cemento", "grieta", "ampliación", "construccion"],
-  pintor: ["pintura", "paredes", "humedad", "impermeabilizar", "latex", "manchas", "cielorraso", "pintar"]
+  pintor: ["pintura", "paredes", "humedad", "impermeabilizar", "latex", "manchas", "cielorraso", "pintar"],
+  "técnico informático": ["computadora", "pc", "notebook", "pantalla", "celular", "impresora", "internet", "wifi", "virus", "tecnologia", "sistema", "tecnico"],
+  computación: ["computadora", "pc", "notebook", "pantalla", "celular", "impresora", "internet", "wifi", "virus", "tecnologia", "sistema", "tecnico"]
 };
 
 function interpretarBusqueda(textoIngresado) {
@@ -130,7 +132,7 @@ export default function Buscar() {
     if (e) e.preventDefault();
     if (!textoBusquedaLibre.trim()) return;
 
-    // Interpretamos el problema (ej: "se me rompió la canilla" -> "plomero")
+    // Interpretamos el problema
     const intencion = interpretarBusqueda(textoBusquedaLibre);
     
     // Buscamos dentro de los rubros cargados si alguno coincide con la intención
@@ -170,6 +172,8 @@ export default function Buscar() {
       const rubroEncontrado = rubros.find(r => r.nombre.toLowerCase().includes(intencion.toLowerCase()));
       if (rubroEncontrado) {
         handleSeleccionarRubro(rubroEncontrado.id);
+      } else {
+        alert(`No encontramos un rubro directo para "${transcripcion}". Por favor selecciona un rubro de la lista.`);
       }
     };
     recognition.onerror = () => setEscuchandoVoz(false);
@@ -274,7 +278,7 @@ export default function Buscar() {
               ✨ Búsqueda inteligente por voz o palabras clave
             </label>
             <p className="text-[11px] text-ink/70 mb-3">
-              Escribí o decí tu problema (Ej. <em>"Se me rompió la canilla"</em> o <em>"No tengo luz"</em>) y te conectamos al instante.
+              Escribí o decí tu problema (Ej. <em>"Se me rompió la computadora"</em> o <em>"No tengo luz"</em>) y te conectamos al instante.
             </p>
             <form onSubmit={handleBusquedaInteligenteSubmit} className="relative flex items-center">
               <input
