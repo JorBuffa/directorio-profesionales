@@ -44,6 +44,9 @@ export default function SoyProfesional() {
   const [mensaje, setMensaje] = useState("");
   const [mostrarModalConfirmacion, setMostrarModalConfirmacion] = useState(false);
 
+  // Estado para mostrar botón manual al administrador tras el registro exitoso
+  const [enlaceAdminWp, setEnlaceAdminWp] = useState("");
+
   // Tu número de administrador configurado
   const NUMERO_ADMIN = "5492216110999";
 
@@ -170,7 +173,6 @@ export default function SoyProfesional() {
   function handlePreRegistro(e) {
     e.preventDefault();
     
-    // Validamos que estén los campos mínimos antes de abrir WhatsApp
     if (!nombreCompleto || !emailRegistro || !passwordRegistro || !whatsapp) {
       alert("Por favor completá los campos obligatorios de acceso.");
       return;
@@ -178,12 +180,10 @@ export default function SoyProfesional() {
 
     const nombreFormateado = capitalizarNombre(nombreCompleto);
     
-    // Abrimos el WhatsApp del profesional con sus credenciales de prueba
     const textoCredenciales = encodeURIComponent(`¡Hola ${nombreFormateado}!\n\nEstás a un paso de registrarte en ConectaOficios. Tus credenciales para cuando finalices serán:\n\n📧 Usuario / Email: ${emailRegistro}\n🔑 Contraseña: ${passwordRegistro}\n\nPor favor, volvé a la pantalla de la app y confirmá si te llegó este mensaje.`);
     const whatsappLimpio = whatsapp.replace(/\D/g, "");
     window.open(`https://wa.me/${whatsappLimpio}?text=${textoCredenciales}`, '_blank');
 
-    // Mostramos el modal de confirmación en la app
     setMostrarModalConfirmacion(true);
   }
 
@@ -193,7 +193,6 @@ export default function SoyProfesional() {
     setMostrarModalConfirmacion(false);
 
     try {
-      // 1. Crear el usuario en Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: emailRegistro,
         password: passwordRegistro,
@@ -227,7 +226,6 @@ export default function SoyProfesional() {
         return null;
       }
 
-      // 2. Subir documentos
       const urlDniFrente = await subirArchivo(dniFrente, 'dni-frente');
       const urlDniDorso = await subirArchivo(dniDorso, 'dni-dorso');
       const urlMatricula = await subirArchivo(certificadoMatricula, 'matricula');
@@ -236,7 +234,6 @@ export default function SoyProfesional() {
       urlDocumentacionPrincipal = urlDniFrente;
       const nombreFormateado = capitalizarNombre(nombreCompleto);
 
-      // 3. Insertar en tabla profesionales
       const { error: dbError } = await supabase.from('profesionales').insert([
         {
           id: userId,
@@ -260,7 +257,6 @@ export default function SoyProfesional() {
         return;
       }
 
-      // 4. Gestionar Rubro
       let rubroFinalId = rubroSeleccionado;
 
       if (rubroSeleccionado === "otro" && nuevoRubro.trim() !== "") {
@@ -285,12 +281,11 @@ export default function SoyProfesional() {
         ]);
       }
 
-      // 5. Enviar aviso automático al Administrador
+      // Generamos el enlace seguro para que el usuario avise al admin mediante un botón táctil limpio
       const textoAvisoAdmin = encodeURIComponent(`Nuevo registro en ConectaOficios:\n\n👤 Nombre: ${nombreFormateado}\n📱 WhatsApp: ${whatsapp}\n📧 Email: ${emailRegistro}\n📍 Localidad: ${localidad}\n\nIngresa al panel para aprobarlo o rechazarlo.`);
-      window.open(`https://wa.me/${NUMERO_ADMIN}?text=${textoAvisoAdmin}`, '_blank');
+      setEnlaceAdminWp(`https://wa.me/${NUMERO_ADMIN}?text=${textoAvisoAdmin}`);
 
-      alert("¡Registro guardado con éxito! Tu cuenta quedó pendiente de aprobación.");
-      setModo("login");
+      setMensaje("¡Registro guardado con éxito! Tu cuenta quedó pendiente de aprobación.");
 
     } catch (err) {
       console.error(err);
@@ -382,227 +377,254 @@ export default function SoyProfesional() {
           <h1 className="font-display text-2xl font-bold text-ink">Registro de Profesional</h1>
           <p className="mt-1 text-sm text-ink/60">Completá tus datos, rubro y subí la documentación requerida para tu validación.</p>
 
-          <form onSubmit={handlePreRegistro} className="mt-6 space-y-6">
-            
-            {/* 1. Datos Personales */}
-            <div className="space-y-4 border-b border-stone pb-4">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-copper">1. Datos Personales y de Acceso</h2>
-              
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Nombre y Apellido</label>
-                <input
-                  type="text"
-                  required
-                  value={nombreCompleto}
-                  onChange={(e) => setNombreCompleto(e.target.value)}
-                  placeholder="Ej. Jorge Buffa"
-                  className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-                />
+          {enlaceAdminWp ? (
+            <div className="mt-6 p-6 bg-green-50 border border-green-200 rounded-sm text-center space-y-4">
+              <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+                ✓
               </div>
-
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Correo Electrónico</label>
-                <input
-                  type="email"
-                  required
-                  value={emailRegistro}
-                  onChange={(e) => setEmailRegistro(e.target.value)}
-                  placeholder="tu@email.com"
-                  className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Contraseña</label>
-                <div className="relative mt-1">
-                  <input
-                    type={mostrarPasswordRegistro ? "text" : "password"}
-                    required
-                    value={passwordRegistro}
-                    onChange={(e) => setPasswordRegistro(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full rounded-sm border border-stone px-3 py-2 pr-10 text-ink focus:border-copper focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setMostrarPasswordRegistro(!mostrarPasswordRegistro)}
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-ink/50 hover:text-ink cursor-pointer text-xs font-medium"
-                  >
-                    {mostrarPasswordRegistro ? "Ocultar" : "Ver"}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">WhatsApp de Contacto</label>
-                <input
-                  type="tel"
-                  required
-                  value={whatsapp}
-                  onChange={(e) => setWhatsapp(e.target.value)}
-                  placeholder="Ej. 3511234567"
-                  className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Dirección</label>
-                <input
-                  type="text"
-                  required
-                  value={direccion}
-                  onChange={(e) => setDireccion(e.target.value)}
-                  placeholder="Ej. San Martín 450"
-                  className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Localidad</label>
-                <input
-                  type="text"
-                  required
-                  value={localidad}
-                  onChange={(e) => setLocalidad(e.target.value)}
-                  className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-                />
-              </div>
-
-              <div className="rounded-sm bg-stone/20 p-4 border border-stone/50 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-medium uppercase tracking-wider text-ink/70">Geolocalización en el mapa</span>
-                  <button
-                    type="button"
-                    onClick={handleUbicarDireccion}
-                    disabled={geocodificando}
-                    className="rounded-sm bg-ink text-paper text-xs px-3 py-1.5 font-medium hover:opacity-90 cursor-pointer disabled:opacity-50"
-                  >
-                    {geocodificando ? "Buscando..." : "📍 Ubicar en el mapa"}
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] uppercase tracking-wider text-ink/60">Latitud</label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={latitud}
-                      placeholder="Automático"
-                      className="mt-1 w-full rounded-sm border border-stone bg-white px-2 py-1 text-xs text-ink/80"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] uppercase tracking-wider text-ink/60">Longitud</label>
-                    <input
-                      type="text"
-                      readOnly
-                      value={longitud}
-                      placeholder="Automático"
-                      className="mt-1 w-full rounded-sm border border-stone bg-white px-2 py-1 text-xs text-ink/80"
-                    />
-                  </div>
-                </div>
-              </div>
+              <h3 className="font-display text-lg font-bold text-green-800">¡Registro Completado con Éxito!</h3>
+              <p className="text-xs text-green-700 leading-relaxed">
+                Tu solicitud fue guardada correctamente y se encuentra pendiente de aprobación. Tocá el siguiente botón para notificar formalmente al administrador por WhatsApp:
+              </p>
+              <a
+                href={enlaceAdminWp}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block w-full bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-3 rounded-sm transition shadow-sm text-center cursor-pointer"
+              >
+                💬 Enviar aviso de alta al Administrador
+              </a>
+              <button
+                type="button"
+                onClick={() => { setEnlaceAdminWp(""); setModo("login"); }}
+                className="block w-full text-xs text-ink/60 hover:text-ink underline pt-2 cursor-pointer"
+              >
+                Ir a Iniciar Sesión
+              </button>
             </div>
-
-            {/* 2. Datos Laborales */}
-            <div className="space-y-4 border-b border-stone pb-4">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-copper">2. Perfil Laboral</h2>
-
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Rubro Principal</label>
-                <select
-                  value={rubroSeleccionado}
-                  onChange={(e) => setRubroSeleccionado(e.target.value)}
-                  className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink bg-white focus:border-copper focus:outline-none"
-                >
-                  {rubros.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.nombre || r.titulo || r.id}
-                    </option>
-                  ))}
-                  <option value="otro">+ Otro rubro (Escribir manual)</option>
-                </select>
-              </div>
-
-              {rubroSeleccionado === "otro" && (
+          ) : (
+            <form onSubmit={handlePreRegistro} className="mt-6 space-y-6">
+              
+              {/* 1. Datos Personales */}
+              <div className="space-y-4 border-b border-stone pb-4">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-copper">1. Datos Personales y de Acceso</h2>
+                
                 <div>
-                  <label className="block text-xs font-medium uppercase tracking-wider text-copper">Especificar Nuevo Rubro</label>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Nombre y Apellido</label>
                   <input
                     type="text"
                     required
-                    value={nuevoRubro}
-                    onChange={(e) => setNuevoRubro(e.target.value)}
-                    placeholder="Ej. Gasista Matriculado"
-                    className="mt-1 w-full rounded-sm border border-copper px-3 py-2 text-ink focus:outline-none bg-copper/5"
+                    value={nombreCompleto}
+                    onChange={(e) => setNombreCompleto(e.target.value)}
+                    placeholder="Ej. Jorge Buffa"
+                    className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
                   />
                 </div>
-              )}
 
-              <div>
-                <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Descripción de Servicios</label>
-                <textarea
-                  rows="3"
-                  value={descripcion}
-                  onChange={(e) => setDescripcion(e.target.value)}
-                  placeholder="Contá brevemente tu experiencia..."
-                  className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-                ></textarea>
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Correo Electrónico</label>
+                  <input
+                    type="email"
+                    required
+                    value={emailRegistro}
+                    onChange={(e) => setEmailRegistro(e.target.value)}
+                    placeholder="tu@email.com"
+                    className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Contraseña</label>
+                  <div className="relative mt-1">
+                    <input
+                      type={mostrarPasswordRegistro ? "text" : "password"}
+                      required
+                      value={passwordRegistro}
+                      onChange={(e) => setPasswordRegistro(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full rounded-sm border border-stone px-3 py-2 pr-10 text-ink focus:border-copper focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMostrarPasswordRegistro(!mostrarPasswordRegistro)}
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-ink/50 hover:text-ink cursor-pointer text-xs font-medium"
+                    >
+                      {mostrarPasswordRegistro ? "Ocultar" : "Ver"}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">WhatsApp de Contacto</label>
+                  <input
+                    type="tel"
+                    required
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    placeholder="Ej. 3511234567"
+                    className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Dirección</label>
+                  <input
+                    type="text"
+                    required
+                    value={direccion}
+                    onChange={(e) => setDireccion(e.target.value)}
+                    placeholder="Ej. San Martín 450"
+                    className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Localidad</label>
+                  <input
+                    type="text"
+                    required
+                    value={localidad}
+                    onChange={(e) => setLocalidad(e.target.value)}
+                    className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
+                  />
+                </div>
+
+                <div className="rounded-sm bg-stone/20 p-4 border border-stone/50 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-medium uppercase tracking-wider text-ink/70">Geolocalización en el mapa</span>
+                    <button
+                      type="button"
+                      onClick={handleUbicarDireccion}
+                      disabled={geocodificando}
+                      className="rounded-sm bg-ink text-paper text-xs px-3 py-1.5 font-medium hover:opacity-90 cursor-pointer disabled:opacity-50"
+                    >
+                      {geocodificando ? "Buscando..." : "📍 Ubicar en el mapa"}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-ink/60">Latitud</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={latitud}
+                        placeholder="Automático"
+                        className="mt-1 w-full rounded-sm border border-stone bg-white px-2 py-1 text-xs text-ink/80"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-wider text-ink/60">Longitud</label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={longitud}
+                        placeholder="Automático"
+                        className="mt-1 w-full rounded-sm border border-stone bg-white px-2 py-1 text-xs text-ink/80"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            {/* 3. Documentación Requerida */}
-            <div className="space-y-4">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-copper">3. Documentación Requerida (Imágenes o PDF)</h2>
+              {/* 2. Datos Laborales */}
+              <div className="space-y-4 border-b border-stone pb-4">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-copper">2. Perfil Laboral</h2>
 
-              <div>
-                <label className="block text-xs font-medium text-ink/80">DNI - Frente</label>
-                <input
-                  type="file"
-                  required
-                  onChange={(e) => setDniFrente(e.target.files[0])}
-                  className="mt-1 w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
-                />
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Rubro Principal</label>
+                  <select
+                    value={rubroSeleccionado}
+                    onChange={(e) => setRubroSeleccionado(e.target.value)}
+                    className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink bg-white focus:border-copper focus:outline-none"
+                  >
+                    {rubros.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.nombre || r.titulo || r.id}
+                      </option>
+                    ))}
+                    <option value="otro">+ Otro rubro (Escribir manual)</option>
+                  </select>
+                </div>
+
+                {rubroSeleccionado === "otro" && (
+                  <div>
+                    <label className="block text-xs font-medium uppercase tracking-wider text-copper">Especificar Nuevo Rubro</label>
+                    <input
+                      type="text"
+                      required
+                      value={nuevoRubro}
+                      onChange={(e) => setNuevoRubro(e.target.value)}
+                      placeholder="Ej. Gasista Matriculado"
+                      className="mt-1 w-full rounded-sm border border-copper px-3 py-2 text-ink focus:outline-none bg-copper/5"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Descripción de Servicios</label>
+                  <textarea
+                    rows="3"
+                    value={descripcion}
+                    onChange={(e) => setDescripcion(e.target.value)}
+                    placeholder="Contá brevemente tu experiencia..."
+                    className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
+                  ></textarea>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-ink/80">DNI - Dorso</label>
-                <input
-                  type="file"
-                  required
-                  onChange={(e) => setDniDorso(e.target.files[0])}
-                  className="mt-1 w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
-                />
+              {/* 3. Documentación Requerida */}
+              <div className="space-y-4">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-copper">3. Documentación Requerida (Imágenes o PDF)</h2>
+
+                <div>
+                  <label className="block text-xs font-medium text-ink/80">DNI - Frente</label>
+                  <input
+                    type="file"
+                    required
+                    onChange={(e) => setDniFrente(e.target.files[0])}
+                    className="mt-1 w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-ink/80">DNI - Dorso</label>
+                  <input
+                    type="file"
+                    required
+                    onChange={(e) => setDniDorso(e.target.files[0])}
+                    className="mt-1 w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-ink/80">Certificado de Matrícula (Opcional o según rubro)</label>
+                  <input
+                    type="file"
+                    onChange={(e) => setCertificadoMatricula(e.target.files[0])}
+                    className="mt-1 w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-ink/80">Certificado de Buena Conducta</label>
+                  <input
+                    type="file"
+                    required
+                    onChange={(e) => setCertificadoBuenaConducta(e.target.files[0])}
+                    className="mt-1 w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-ink/80">Certificado de Matrícula (Opcional o según rubro)</label>
-                <input
-                  type="file"
-                  onChange={(e) => setCertificadoMatricula(e.target.files[0])}
-                  className="mt-1 w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-ink/80">Certificado de Buena Conducta</label>
-                <input
-                  type="file"
-                  required
-                  onChange={(e) => setCertificadoBuenaConducta(e.target.files[0])}
-                  className="mt-1 w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={cargando}
-              className="w-full rounded-sm bg-copper py-2.5 font-medium text-paper hover:opacity-90 cursor-pointer mt-4"
-            >
-              {cargando ? "Procesando..." : "Guardar y Verificar WhatsApp"}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={cargando}
+                className="w-full rounded-sm bg-copper py-2.5 font-medium text-paper hover:opacity-90 cursor-pointer mt-4"
+              >
+                {cargando ? "Procesando..." : "Guardar y Verificar WhatsApp"}
+              </button>
+            </form>
+          )}
 
           <div className="mt-6 border-t border-stone pt-4 text-center">
             <button
