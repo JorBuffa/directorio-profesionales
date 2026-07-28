@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../api/supabaseClient.js";
 import MapView from "../components/MapView.jsx";
 
-// Diccionario inteligente ampliado para interpretar problemas cotidianos (incluyendo tecnología e informática)
+// Diccionario inteligente ampliado para interpretar problemas cotidianos y servicios
 const diccionarioRubros = {
   plomero: ["canilla", "agua", "fuga", "pérdida", "inodoro", "tubo", "caño", "desagüe", "gotera", "tanque", "bomba", "plomeria"],
   gasista: ["gas", "estufa", "calefón", "termotanque", "cocina", "fuga de gas", "valvula", "medidor"],
@@ -11,7 +11,9 @@ const diccionarioRubros = {
   albanil: ["pared", "humedad", "piso", "techo", "revoque", "ladrillo", "cemento", "grieta", "ampliación", "construccion"],
   pintor: ["pintura", "paredes", "humedad", "impermeabilizar", "latex", "manchas", "cielorraso", "pintar"],
   "técnico informático": ["computadora", "pc", "notebook", "pantalla", "celular", "impresora", "internet", "wifi", "virus", "tecnologia", "sistema", "tecnico"],
-  computación: ["computadora", "pc", "notebook", "pantalla", "celular", "impresora", "internet", "wifi", "virus", "tecnologia", "sistema", "tecnico"]
+  computación: ["computadora", "pc", "notebook", "pantalla", "celular", "impresora", "internet", "wifi", "virus", "tecnologia", "sistema", "tecnico"],
+  pasteleria: ["budín", "budin", "torta", "pastel", "dulce", "pan", "panaderia", "facturas", "postre", "cumpleaños", "reposteria", "pasteleria"],
+  jardineria: ["jardín", "jardin", "pasto", "césped", "cesped", "parquización", "parquizacion", "poda", "cortar pasto", "plantas", "arboles", "jardinero"]
 };
 
 function interpretarBusqueda(textoIngresado) {
@@ -148,6 +150,12 @@ export default function Buscar() {
     }
     if (textoMinuscula.includes("computadora") || textoMinuscula.includes("pc") || textoMinuscula.includes("notebook") || textoMinuscula.includes("pantalla") || textoMinuscula.includes("celular") || textoMinuscula.includes("impresora") || textoMinuscula.includes("wifi")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("informát") || r.nombre.toLowerCase().includes("comput") || r.nombre.toLowerCase().includes("tecn"));
+    }
+    if (textoMinuscula.includes("budín") || textoMinuscula.includes("budin") || textoMinuscula.includes("torta") || textoMinuscula.includes("pastel") || textoMinuscula.includes("pan") || textoMinuscula.includes("dulce") || textoMinuscula.includes("postre") || textoMinuscula.includes("pasteleria")) {
+      return rubros.find(r => r.nombre.toLowerCase().includes("pasteler") || r.nombre.toLowerCase().includes("panader") || r.nombre.toLowerCase().includes("reposteri"));
+    }
+    if (textoMinuscula.includes("jardín") || textoMinuscula.includes("jardin") || textoMinuscula.includes("pasto") || textoMinuscula.includes("césped") || textoMinuscula.includes("cesped") || textoMinuscula.includes("parquización") || textoMinuscula.includes("parquizacion") || textoMinuscula.includes("poda") || textoMinuscula.includes("jardinero")) {
+      return rubros.find(r => r.nombre.toLowerCase().includes("jardin") || r.nombre.toLowerCase().includes("parquiza"));
     }
 
     // Coincidencia genérica si escribe el nombre directo
@@ -297,14 +305,14 @@ export default function Buscar() {
               ✨ Búsqueda inteligente por voz o palabras clave
             </label>
             <p className="text-[11px] text-ink/70 mb-3">
-              Escribí o decí tu problema (Ej. <em>"Se me rompió la computadora"</em> o <em>"No tengo luz"</em>) y te conectamos al instante.
+              Escribí o decí tu problema (Ej. <em>"Necesito cortar el pasto y podar"</em>, <em>"Quiero encargar un budín"</em>) y te conectamos al instante.
             </p>
             <form onSubmit={handleBusquedaInteligenteSubmit} className="relative flex items-center">
               <input
                 type="text"
                 value={textoBusquedaLibre}
                 onChange={(e) => setTextoBusquedaLibre(e.target.value)}
-                placeholder="¿Qué problema tenés para arreglar?"
+                placeholder="¿Qué servicio o producto buscás?"
                 className="w-full rounded-sm border border-stone bg-white px-3 py-2.5 pr-20 text-ink focus:border-copper focus:outline-none text-xs"
               />
               <button
