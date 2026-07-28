@@ -127,23 +127,44 @@ export default function Buscar() {
     }
   }
 
-  // Función para manejar la búsqueda inteligente por texto o voz
+  // Función robusta para mapear el texto libre al rubro correcto de Supabase
+  function procesarTextoBúsqueda(texto) {
+    const textoMinuscula = texto.toLowerCase();
+    
+    if (textoMinuscula.includes("canilla") || textoMinuscula.includes("agua") || textoMinuscula.includes("fuga") || textoMinuscula.includes("pérdida") || textoMinuscula.includes("inodoro") || textoMinuscula.includes("caño") || textoMinuscula.includes("gotera") || textoMinuscula.includes("plomeria")) {
+      return rubros.find(r => r.nombre.toLowerCase().includes("plom"));
+    }
+    if (textoMinuscula.includes("gas") || textoMinuscula.includes("estufa") || textoMinuscula.includes("calefón") || textoMinuscula.includes("termotanque") || textoMinuscula.includes("cocina")) {
+      return rubros.find(r => r.nombre.toLowerCase().includes("gas"));
+    }
+    if (textoMinuscula.includes("luz") || textoMinuscula.includes("corto") || textoMinuscula.includes("enchufe") || textoMinuscula.includes("foco") || textoMinuscula.includes("térmica") || textoMinuscula.includes("electricidad")) {
+      return rubros.find(r => r.nombre.toLowerCase().includes("electric"));
+    }
+    if (textoMinuscula.includes("pared") || textoMinuscula.includes("humedad") || textoMinuscula.includes("piso") || textoMinuscula.includes("techo") || textoMinuscula.includes("ladrillo") || textoMinuscula.includes("construccion")) {
+      return rubros.find(r => r.nombre.toLowerCase().includes("albañil") || r.nombre.toLowerCase().includes("albanil"));
+    }
+    if (textoMinuscula.includes("pintura") || textoMinuscula.includes("pintar") || textoMinuscula.includes("cielorraso")) {
+      return rubros.find(r => r.nombre.toLowerCase().includes("pintor"));
+    }
+    if (textoMinuscula.includes("computadora") || textoMinuscula.includes("pc") || textoMinuscula.includes("notebook") || textoMinuscula.includes("pantalla") || textoMinuscula.includes("celular") || textoMinuscula.includes("impresora") || textoMinuscula.includes("wifi")) {
+      return rubros.find(r => r.nombre.toLowerCase().includes("informát") || r.nombre.toLowerCase().includes("comput") || r.nombre.toLowerCase().includes("tecn"));
+    }
+
+    // Coincidencia genérica si escribe el nombre directo
+    return rubros.find(r => r.nombre.toLowerCase().includes(textoMinuscula));
+  }
+
+  // Función para manejar la búsqueda inteligente por texto
   function handleBusquedaInteligenteSubmit(e) {
     if (e) e.preventDefault();
     if (!textoBusquedaLibre.trim()) return;
 
-    // Interpretamos el problema
-    const intencion = interpretarBusqueda(textoBusquedaLibre);
-    
-    // Buscamos dentro de los rubros cargados si alguno coincide con la intención
-    const rubroEncontrado = rubros.find(r => 
-      r.nombre.toLowerCase().includes(intencion.toLowerCase())
-    );
+    const rubroEncontrado = procesarTextoBúsqueda(textoBusquedaLibre);
 
     if (rubroEncontrado) {
       handleSeleccionarRubro(rubroEncontrado.id);
     } else {
-      alert(`No encontramos un rubro directo para "${textoBusquedaLibre}". Por favor selecciona un rubro de la lista o intenta otra descripción.`);
+      alert(`No encontramos un rubro asociado a "${textoBusquedaLibre}". Por favor selecciona un rubro de la lista.`);
     }
   }
 
@@ -167,9 +188,7 @@ export default function Buscar() {
       setTextoBusquedaLibre(transcripcion);
       setEscuchandoVoz(false);
       
-      // Auto-ejecutar búsqueda con el texto interpretado de la voz
-      const intencion = interpretarBusqueda(transcripcion);
-      const rubroEncontrado = rubros.find(r => r.nombre.toLowerCase().includes(intencion.toLowerCase()));
+      const rubroEncontrado = procesarTextoBúsqueda(transcripcion);
       if (rubroEncontrado) {
         handleSeleccionarRubro(rubroEncontrado.id);
       } else {
