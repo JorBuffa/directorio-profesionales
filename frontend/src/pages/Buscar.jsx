@@ -214,9 +214,9 @@ export default function Buscar() {
         </div>
       )}
 
-      {/* PASO 3 */}
+      {/* PASO 3: MAPA ARRIBA Y LISTADO DEBAJO */}
       {paso === "resultados" && (
-        <div>
+        <div className="space-y-6">
           {/* Cabecera adaptada con botón grande y llamativo */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-stone pb-4 gap-4">
             <div>
@@ -231,56 +231,64 @@ export default function Buscar() {
             </button>
           </div>
 
-          <div className="mt-6 grid gap-8 lg:grid-cols-2">
-            <div className="space-y-4">
-              {profesionalesFiltrados.length === 0 && (
-                <div className="rounded-sm border border-stone bg-white p-6 text-center">
-                  <p className="text-sm text-ink/50">No hay profesionales aprobados en este rubro todavía.</p>
-                </div>
-              )}
+          {/* 1. MAPA GRANDE PRIMERO */}
+          <div className="h-[450px] w-full overflow-hidden rounded-sm border border-stone bg-white shadow-sm">
+            <MapView profesionales={profesionalesFiltrados} centroCliente={ubicacionCliente} />
+          </div>
 
-              {profesionalesFiltrados.map((p, index) => {
-                const telWp = p.whatsapp || p.telefono || "";
-                const mensajeWp = encodeURIComponent(`Hola ${p.nombre_completo || p.nombre}, te contacto desde ConectaOficios. Necesito tus servicios.`);
-                const linkWhatsapp = telWp ? `https://wa.me/${telWp.replace(/\D/g, '')}?text=${mensajeWp}` : "#";
+          {/* 2. LISTADO DE PROFESIONALES DEBAJO DEL MAPA */}
+          <div>
+            <h2 className="font-display text-xl font-bold text-ink mb-4">Listado de profesionales encontrados</h2>
 
-                return (
-                  <div key={p.id} className="rounded-sm border border-stone bg-white p-5 shadow-sm relative">
-                    <span className="absolute top-4 right-4 rounded-full bg-copper/10 px-2.5 py-1 font-mono text-xs font-bold text-copper-dark">
-                      #{index + 1} más cercano ({p.distanciaKm.toFixed(1)} km)
-                    </span>
-                    <h2 className="font-display text-lg font-bold text-ink">{p.nombre_completo || p.nombre}</h2>
-                    <p className="text-xs uppercase tracking-wide text-stone-dark font-medium mt-0.5">
-                      {p.direccion}, {p.localidad || "Unquillo"}
-                    </p>
+            {profesionalesFiltrados.length === 0 ? (
+              <div className="rounded-sm border border-stone bg-white p-6 text-center">
+                <p className="text-sm text-ink/50">No hay profesionales aprobados en este rubro todavía.</p>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {profesionalesFiltrados.map((p, index) => {
+                  const telWp = p.whatsapp || p.telefono || "";
+                  const mensajeWp = encodeURIComponent(`Hola ${p.nombre_completo || p.nombre}, te contacto desde ConectaOficios. Necesito tus servicios.`);
+                  const linkWhatsapp = telWp ? `https://wa.me/${telWp.replace(/\D/g, '')}?text=${mensajeWp}` : "#";
 
-                    {/* Descripción de los servicios del profesional */}
-                    {p.descripcion && (
-                      <p className="text-xs text-ink/80 mt-2 bg-stone/5 p-2 rounded-sm border border-stone/30">
-                        <strong>Servicios:</strong> {p.descripcion}
-                      </p>
-                    )}
+                  return (
+                    <div key={p.id} className="rounded-sm border border-stone bg-white p-5 shadow-sm relative flex flex-col justify-between">
+                      <div>
+                        <span className="absolute top-4 right-4 rounded-full bg-copper/10 px-2.5 py-1 font-mono text-xs font-bold text-copper-dark">
+                          #{index + 1} ({p.distanciaKm.toFixed(1)} km)
+                        </span>
+                        <h3 className="font-display text-lg font-bold text-ink pr-16">{p.nombre_completo || p.nombre}</h3>
+                        <p className="text-xs uppercase tracking-wide text-stone-dark font-medium mt-0.5">
+                          {p.direccion}, {p.localidad || "Unquillo"}
+                        </p>
 
-                    <p className="mt-2 text-sm text-ink/70">WhatsApp: <strong>{telWp || "No especificado"}</strong></p>
-                    
-                    {telWp && (
-                      <a
-                        href={linkWhatsapp}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-4 inline-flex items-center justify-center w-full rounded-sm bg-green-600 px-4 py-2 text-xs font-bold text-white hover:bg-green-700 transition cursor-pointer"
-                      >
-                        💬 Contactar por WhatsApp
-                      </a>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                        {/* Descripción de los servicios del profesional */}
+                        {p.descripcion && (
+                          <p className="text-xs text-ink/80 mt-2 bg-stone/5 p-2 rounded-sm border border-stone/30">
+                            <strong>Servicios:</strong> {p.descripcion}
+                          </p>
+                        )}
+                      </div>
 
-            <div className="h-[500px] overflow-hidden rounded-sm border border-stone bg-white shadow-sm">
-              <MapView profesionales={profesionalesFiltrados} centroCliente={ubicacionCliente} />
-            </div>
+                      <div className="mt-4 pt-3 border-t border-stone/40">
+                        <p className="text-xs text-ink/70 mb-2">WhatsApp: <strong>{telWp || "No especificado"}</strong></p>
+                        
+                        {telWp && (
+                          <a
+                            href={linkWhatsapp}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center w-full rounded-sm bg-green-600 px-4 py-2 text-xs font-bold text-white hover:bg-green-700 transition cursor-pointer"
+                          >
+                            💬 Contactar por WhatsApp
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -46,21 +46,39 @@ export default function MapView({ profesionales = [], centroCliente = null }) {
       )}
 
       {profesionales.map((p) => {
-        // Tomamos latFinal / lngFinal prioritariamente
         const lat = p.latFinal || p.lat || p.latitud;
         const lng = p.lngFinal || p.lng || p.longitud;
 
         if (!lat || !lng) return null;
 
+        const telWp = p.whatsapp || p.telefono || "";
+        const nombreProf = p.nombre_completo || p.nombre || "Profesional";
+        const mensajeWp = encodeURIComponent(`Hola ${nombreProf}, te contacto desde ConectaOficios. Necesito tus servicios.`);
+        const linkWhatsapp = telWp ? `https://wa.me/${telWp.replace(/\D/g, '')}?text=${mensajeWp}` : "#";
+
         return (
           <Marker key={p.id} position={[parseFloat(lat), parseFloat(lng)]} icon={iconoProfesional}>
             <Popup>
-              <div className="p-1">
-                <p className="font-bold text-ink">{p.nombre_completo || p.nombre}</p>
-                <p className="text-xs text-ink/70">{p.direccion || p.localidad || "Unquillo"}</p>
+              <div className="p-1 font-sans min-w-[180px]">
+                <p className="font-bold text-ink text-base">{nombreProf}</p>
+                <p className="text-xs text-ink/70 mt-0.5 uppercase">{p.direccion || p.localidad || "Unquillo"}</p>
+                
                 <p className="mt-1 text-xs font-bold text-copper">
                   {p.distanciaKm !== undefined ? `${p.distanciaKm.toFixed(1)} km de distancia` : ""}
                 </p>
+
+                {telWp ? (
+                  <a
+                    href={linkWhatsapp}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center justify-center w-full rounded-sm bg-green-600 px-3 py-2 text-xs font-bold text-white hover:bg-green-700 transition cursor-pointer"
+                  >
+                    💬 Contactar por WhatsApp
+                  </a>
+                ) : (
+                  <p className="mt-2 text-xs text-red-500 italic">Sin WhatsApp registrado</p>
+                )}
               </div>
             </Popup>
           </Marker>
