@@ -23,9 +23,9 @@ export default function SoyProfesional() {
   const [longitud, setLongitud] = useState("");
   const [geocodificando, setGeocodificando] = useState(false);
 
-  // Datos Laborales y Rubros Dinámicos
+  // Datos Laborales y Rubros Múltiples
   const [rubros, setRubros] = useState([]);
-  const [rubroSeleccionado, setRubroSeleccionado] = useState("");
+  const [rubrosSeleccionados, setRubrosSeleccionados] = useState([]);
   const [nuevoRubro, setNuevoRubro] = useState("");
   const [descripcion, setDescripcion] = useState("");
 
@@ -55,7 +55,6 @@ export default function SoyProfesional() {
       const { data, error } = await supabase.from('rubros').select('*');
       if (!error && data) {
         setRubros(data);
-        if (data.length > 0) setRubroSeleccionado(data[0].id);
       }
     }
     cargarRubros();
@@ -75,6 +74,14 @@ export default function SoyProfesional() {
       .split(" ")
       .map(palabra => palabra ? palabra.charAt(0).toUpperCase() + palabra.slice(1) : "")
       .join(" ");
+  }
+
+  function handleCheckboxRubro(rubroId) {
+    if (rubrosSeleccionados.includes(rubroId)) {
+      setRubrosSeleccionados(rubrosSeleccionados.filter(id => id !== rubroId));
+    } else {
+      setRubrosSeleccionados([...rubrosSeleccionados, rubroId]);
+    }
   }
 
   async function handleUbicarDireccion() {
@@ -169,12 +176,16 @@ export default function SoyProfesional() {
     }
   }
 
-  // PASO 1: Dispara la apertura del WhatsApp para que el usuario valide si le llegó
   function handlePreRegistro(e) {
     e.preventDefault();
     
     if (!nombreCompleto || !emailRegistro || !passwordRegistro || !whatsapp) {
       alert("Por favor completá los campos obligatorios de acceso.");
+      return;
+    }
+
+    if (rubrosSeleccionados.length === 0 && !nuevoRubro.trim()) {
+      alert("Por favor selecciona al menos un rubro u oficio.");
       return;
     }
 
@@ -187,7 +198,6 @@ export default function SoyProfesional() {
     setMostrarModalConfirmacion(true);
   }
 
-  // PASO 2: Si el usuario dice que SÍ le llegó, se ejecuta el guardado real en la base de datos
   async function confirmarRegistroYGuardar() {
     setCargando(true);
     setMostrarModalConfirmacion(false);
@@ -257,9 +267,10 @@ export default function SoyProfesional() {
         return;
       }
 
-      let rubroFinalId = rubroSeleccionado;
+      // Procesar Rubros Seleccionados y Opcionales
+      let listaRubrosIdsFinales = [...rubrosSeleccionados];
 
-      if (rubroSeleccionado === "otro" && nuevoRubro.trim() !== "") {
+      if (nuevoRubro.trim() !== "") {
         const rubroFormateado = capitalizarTexto(nuevoRubro);
         const { data: nuevoRubroData, error: errorNuevoRubro } = await supabase
           .from('rubros')
@@ -268,20 +279,20 @@ export default function SoyProfesional() {
           .single();
 
         if (!errorNuevoRubro && nuevoRubroData) {
-          rubroFinalId = nuevoRubroData.id;
+          listaRubrosIdsFinales.push(nuevoRubroData.id);
         }
       }
 
-      if (rubroFinalId && rubroFinalId !== "otro" && userId) {
-        await supabase.from('profesional_rubros').insert([
-          {
-            profesional_id: userId,
-            rubro_id: rubroFinalId
-          }
-        ]);
+      // Insertar relaciones múltiples en profesional_rubros
+      if (listaRubrosIdsFinales.length > 0 && userId) {
+        const relacionesARecordar = listaRubrosIdsFinales.map(rId => ({
+          profesional_id: userId,
+          rubro_id: rId
+        }));
+
+        await supabase.from('profesional_rubros').insert(relacionesARecordar);
       }
 
-      // Generamos el enlace seguro para que el usuario avise al admin mediante un botón táctil limpio
       const textoAvisoAdmin = encodeURIComponent(`Nuevo registro en ConectaOficios:\n\n👤 Nombre: ${nombreFormateado}\n📱 WhatsApp: ${whatsapp}\n📧 Email: ${emailRegistro}\n📍 Localidad: ${localidad}\n\nIngresa al panel para aprobarlo o rechazarlo.`);
       setEnlaceAdminWp(`https://wa.me/${NUMERO_ADMIN}?text=${textoAvisoAdmin}`);
 
@@ -375,7 +386,7 @@ export default function SoyProfesional() {
       {modo === "registro" && (
         <div className="rounded-sm border border-stone bg-white p-8 shadow-sm">
           <h1 className="font-display text-2xl font-bold text-ink">Registro de Profesional</h1>
-          <p className="mt-1 text-sm text-ink/60">Completá tus datos, rubro y subí la documentación requerida para tu validación.</p>
+          <p className="mt-1 text-sm text-ink/60">Completá tus datos, rubros y subí la documentación requerida para tu validación.</p>
 
           {enlaceAdminWp ? (
             <div className="mt-6 p-6 bg-green-50 border border-green-200 rounded-sm text-center space-y-4">
@@ -526,39 +537,40 @@ export default function SoyProfesional() {
                 </div>
               </div>
 
-              {/* 2. Datos Laborales */}
+              {/* 2. Perfil Laboral (Rubros Múltiples) */}
               <div className="space-y-4 border-b border-stone pb-4">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-copper">2. Perfil Laboral</h2>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-copper">2. Perfil Laboral (Rubros u Oficios)</h2>
 
                 <div>
-                  <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Rubro Principal</label>
-                  <select
-                    value={rubroSeleccionado}
-                    onChange={(e) => setRubroSeleccionado(e.target.value)}
-                    className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink bg-white focus:border-copper focus:outline-none"
-                  >
+                  <label className="block text-xs font-medium uppercase tracking-wider text-ink/60 mb-2">
+                    Selecciona uno o varios rubros en los que trabajas:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 bg-stone/5 rounded border border-stone/30">
                     {rubros.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.nombre || r.titulo || r.id}
-                      </option>
+                      <label key={r.id} className="flex items-center gap-2 text-xs text-ink cursor-pointer bg-white p-2 rounded border border-stone/20 hover:border-copper">
+                        <input
+                          type="checkbox"
+                          value={r.id}
+                          checked={rubrosSeleccionados.includes(r.id)}
+                          onChange={() => handleCheckboxRubro(r.id)}
+                          className="rounded border-stone text-copper focus:ring-copper"
+                        />
+                        {capitalizarTexto(r.nombre || r.titulo)}
+                      </label>
                     ))}
-                    <option value="otro">+ Otro rubro (Escribir manual)</option>
-                  </select>
+                  </div>
                 </div>
 
-                {rubroSeleccionado === "otro" && (
-                  <div>
-                    <label className="block text-xs font-medium uppercase tracking-wider text-copper">Especificar Nuevo Rubro</label>
-                    <input
-                      type="text"
-                      required
-                      value={nuevoRubro}
-                      onChange={(e) => setNuevoRubro(e.target.value)}
-                      placeholder="Ej. Gasista Matriculado"
-                      className="mt-1 w-full rounded-sm border border-copper px-3 py-2 text-ink focus:outline-none bg-copper/5"
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-copper">¿Falta algún rubro? Escribirlo manual (Opcional)</label>
+                  <input
+                    type="text"
+                    value={nuevoRubro}
+                    onChange={(e) => setNuevoRubro(e.target.value)}
+                    placeholder="Ej. Gasista Matriculado"
+                    className="mt-1 w-full rounded-sm border border-copper px-3 py-2 text-ink focus:outline-none bg-copper/5"
+                  />
+                </div>
 
                 <div>
                   <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Descripción de Servicios</label>

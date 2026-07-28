@@ -1,22 +1,35 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../api/supabaseClient.js";
 
+// =========================================================================
+// CONFIGURACIÓN DE CONTACTO DE WHATSAPP DEL ADMIN
+// =========================================================================
+const NUMERO_WHATSAPP_ADMIN = "5492216110999";
+
 export default function EditarPerfil() {
   const [identificador, setIdentificador] = useState("");
   const [profesional, setProfesional] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState("");
   
-  // Estado para la gestión de archivos adjuntos del Storage
-  const [archivosStorage, setArchivosStorage] = useState([]);
+  // Definición de etiquetas fijas para los documentos requeridos
+  const TIPOS_DOCUMENTOS_OBLIGATORIOS = [
+    { id: "dni_frente", label: "DNI (Frente)" },
+    { id: "dni_dorso", label: "DNI (Dorso)" },
+    { id: "matricula", label: "Matrícula / Certificado" },
+    { id: "adicional", label: "Documento Adicional / CV" }
+  ];
+
+  const [documentosProfesional, setDocumentosProfesional] = useState({});
   const [nuevoArchivo, setNuevoArchivo] = useState(null);
+  const [tipoDocumentoSubida, setTipoDocumentoSubida] = useState("dni_frente");
   const [subiendoArchivo, setSubiendoArchivo] = useState(false);
 
-  // Cargar archivos del Storage cuando se selecciona un profesional
+  // Cargar y mapear archivos del Storage cuando se selecciona un profesional
   useEffect(() => {
     async function obtenerArchivosDelStorage() {
       if (!profesional) {
-        setArchivosStorage([]);
+        setDocumentosProfesional({});
         return;
       }
 
@@ -25,29 +38,42 @@ export default function EditarPerfil() {
           .from('documentos')
           .list('', { limit: 100 });
 
-        if (!error && data) {
-          const matches = data.filter(file => 
-            file.name.includes(profesional.id) || 
-            (profesional.email && file.name.toLowerCase().includes(profesional.email.toLowerCase().split('@')[0]))
+        if (error) throw error;
+
+        const docsMapeados = {};
+
+        TIPOS_DOCUMENTOS_OBLIGATORIOS.forEach(tipo => {
+          // Buscamos si hay un archivo que pertenezca al profesional y coincida con el tipo
+          const archivoEncontrado = data?.find(file => 
+            file.name.includes(profesional.id) && file.name.includes(tipo.id)
           );
 
-          const archivosConUrl = matches.map((file) => {
+          if (archivoEncontrado) {
             const { data: urlData } = supabase.storage
               .from('documentos')
-              .getPublicUrl(file.name);
-            return {
-              nombre: file.name,
+              .getPublicUrl(archivoEncontrado.name);
+
+            docsMapeados[tipo.id] = {
+              nombreArchivo: archivoEncontrado.name,
               url: urlData.publicUrl
             };
-          });
+          } else {
+            docsMapeados[tipo.id] = null; // Casillero vacío disponible
+          }
+        });
 
-          setArchivosStorage(archivosConUrl);
-        } else {
-          setArchivosStorage([]);
+        // Soporte para campo legado general si existiera
+        if (profesional.documentacion_url && !docsMapeados['dni_frente']) {
+          docsMapeados['dni_frente'] = {
+            nombreArchivo: "documento_principal",
+            url: profesional.documentacion_url
+          };
         }
+
+        setDocumentosProfesional(docsMapeados);
       } catch (err) {
         console.error("Error al listar archivos del storage:", err);
-        setArchivosStorage([]);
+        setDocumentosProfesional({});
       }
     }
 
@@ -81,26 +107,35 @@ export default function EditarPerfil() {
     }
   }
 
-  // Borrar un archivo del Storage
-  async function handleEliminarArchivo(nombreArchivo) {
-    if (!window.confirm("¿Estás seguro de querer eliminar este documento?")) return;
+  // Borrar un archivo específico manteniendo el casillero vacío disponible
+  async function handleEliminarArchivo(tipoId) {
+    const docInfo = documentosProfesional[tipoId];
+    if (!docInfo) return;
+
+    if (!window.confirm("¿Estás seguro de querer eliminar este documento? El espacio quedará disponible para volver a cargarlo.")) return;
 
     try {
-      const { error } = await supabase.storage
-        .from('documentos')
-        .remove([nombreArchivo]);
+      if (docInfo.nombreArchivo && docInfo.nombreArchivo !== "documento_principal") {
+        const { error } = await supabase.storage
+          .from('documentos')
+          .remove([docInfo.nombreArchivo]);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
-      // Actualizamos la lista visual filtrando el borrado
-      setArchivosStorage(prev => prev.filter(f => f.nombre !== nombreArchivo));
-      alert("Documento eliminado correctamente.");
+      // Actualizamos estado local dejando el casillero vacío
+      setDocumentosProfesional(prev => ({
+        ...prev,
+        [tipoId]: null
+      }));
+
+      alert("Documento eliminado correctamente. El casillero ya se encuentra disponible.");
     } catch (err) {
       alert("Error al eliminar el archivo: " + err.message);
     }
   }
 
-  // Subir un nuevo archivo y cambiar estado a pendiente de revisión
+  // Subir un nuevo archivo, cambiar estado a pendiente y notificar por WhatsApp al Admin
   async function handleSubirNuevoArchivo(e) {
     e.preventDefault();
     if (!nuevoArchivo) return;
@@ -108,7 +143,7 @@ export default function EditarPerfil() {
     setSubiendoArchivo(true);
     try {
       const fileExt = nuevoArchivo.name.split('.').pop();
-      const fileName = `${profesional.id}_${Date.now()}.${fileExt}`;
+      const fileName = `${profesional.id}-${tipoDocumentoSubida}-${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('documentos')
@@ -120,16 +155,22 @@ export default function EditarPerfil() {
         .from('documentos')
         .getPublicUrl(fileName);
 
-      // Actualizamos también la base de datos (pasando el estado a pendiente para que el admin lo revise)
+      // Actualizamos la base de datos (estado a pendiente para revisión)
       const { error: updateError } = await supabase
         .from('profesionales')
         .update({
           documentacion_url: urlData.publicUrl,
-          estado: 'pendiente' // Vuelve a pendiente para que el admin lo apruebe con la nueva doc
+          estado: 'pendiente'
         })
         .eq('id', profesional.id);
 
       if (updateError) throw updateError;
+
+      // Notificar automáticamente al WhatsApp del Administrador
+      const nombreProf = profesional.nombre_completo || profesional.nombre || "Profesional";
+      const mensajeAdmin = `⚠️ *AVISO DE NUEVA REVISIÓN*:\nEl profesional *${nombreProf}* ha actualizado/subido un documento (${tipoDocumentoSubida}) y solicita revisión y aprobación en el panel.`;
+      
+      window.open(`https://wa.me/${NUMERO_WHATSAPP_ADMIN}?text=${encodeURIComponent(mensajeAdmin)}`, '_blank');
 
       alert("¡Documento subido con éxito! Tu perfil ha sido enviado nuevamente a revisión.");
       
@@ -137,14 +178,22 @@ export default function EditarPerfil() {
       setProfesional(prev => ({ ...prev, estado: 'pendiente', documentacion_url: urlData.publicUrl }));
       setNuevoArchivo(null);
 
-      // Refrescamos los archivos listados
+      // Refrescamos los archivos listados en las etiquetas fijas
       const { data: listData } = await supabase.storage.from('documentos').list('', { limit: 100 });
       if (listData) {
-        const matches = listData.filter(file => file.name.includes(profesional.id));
-        setArchivosStorage(matches.map(file => ({
-          nombre: file.name,
-          url: supabase.storage.from('documentos').getPublicUrl(file.name).data.publicUrl
-        })));
+        const docsMapeados = {};
+        TIPOS_DOCUMENTOS_OBLIGATORIOS.forEach(tipo => {
+          const archivoEncontrado = listData.find(file => 
+            file.name.includes(profesional.id) && file.name.includes(tipo.id)
+          );
+          if (archivoEncontrado) {
+            const { data: uData } = supabase.storage.from('documentos').getPublicUrl(archivoEncontrado.name);
+            docsMapeados[tipo.id] = { nombreArchivo: archivoEncontrado.name, url: uData.publicUrl };
+          } else {
+            docsMapeados[tipo.id] = null;
+          }
+        });
+        setDocumentosProfesional(docsMapeados);
       }
 
     } catch (err) {
@@ -285,53 +334,90 @@ export default function EditarPerfil() {
             </button>
           </form>
 
-          {/* SECCIÓN DE GESTIÓN DE DOCUMENTACIÓN */}
+          {/* SECCIÓN DE GESTIÓN DE DOCUMENTACIÓN CON ETIQUETAS FIJAS */}
           <div className="rounded-sm border border-stone bg-white p-6 shadow-sm space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-wider text-copper">Gestión de Documentación</h2>
-            <p className="text-xs text-ink/60">Aquí podés ver los documentos que subiste, eliminarlos si están desactualizados o adjuntar uno nuevo.</p>
+            <p className="text-xs text-ink/60">Visualizá tus documentos actuales, eliminalos si están desactualizados o subí un archivo nuevo para reactivar tu cuenta.</p>
 
-            <div className="space-y-2">
-              {archivosStorage.length > 0 ? (
-                archivosStorage.map((file, idx) => (
-                  <div key={idx} className="flex items-center justify-between rounded-sm border border-stone bg-stone/5 p-3">
-                    <a
-                      href={file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs font-medium text-taller underline truncate max-w-[220px]"
-                    >
-                      📄 {file.nombre}
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => handleEliminarArchivo(file.nombre)}
-                      className="rounded-sm bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200 cursor-pointer"
-                    >
-                      Eliminar
-                    </button>
+            <div className="space-y-3">
+              {TIPOS_DOCUMENTOS_OBLIGATORIOS.map((tipo) => {
+                const doc = documentosProfesional[tipo.id];
+                return (
+                  <div key={tipo.id} className="flex items-center justify-between rounded-sm border border-stone/30 bg-stone/5 p-3">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <span className="text-xs font-bold text-ink min-w-[140px] uppercase">
+                        {tipo.label}:
+                      </span>
+                      {doc ? (
+                        <span className="text-xs text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded truncate max-w-[150px]">
+                          ✓ Cargado
+                        </span>
+                      ) : (
+                        <span className="text-xs text-amber-700 font-medium bg-amber-50 px-2 py-0.5 rounded italic">
+                          Casillero vacío (disponible)
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {doc && (
+                        <a
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-sm bg-stone/20 px-3 py-1.5 text-xs font-medium text-ink hover:bg-stone/30 border border-stone cursor-pointer"
+                        >
+                          Ver
+                        </a>
+                      )}
+
+                      {doc ? (
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarArchivo(tipo.id)}
+                          className="rounded-sm bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-200 cursor-pointer border border-red-200"
+                        >
+                          Eliminar
+                        </button>
+                      ) : (
+                        <span className="text-xs text-stone-400 italic px-2">Sin archivo</span>
+                      )}
+                    </div>
                   </div>
-                ))
-              ) : (
-                <p className="text-xs text-ink/40 italic">No hay documentos cargados actualmente en el sistema.</p>
-              )}
+                );
+              })}
             </div>
 
-            {/* FORMULARIO PARA SUBIR NUEVO DOCUMENTO */}
+            {/* FORMULARIO PARA SUBIR NUEVO DOCUMENTO CON SELECCIÓN DE TIPO */}
             <form onSubmit={handleSubirNuevoArchivo} className="mt-4 border-t border-stone pt-4 space-y-3">
               <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">
                 Subir nuevo documento (Actualización)
               </label>
-              <input
-                type="file"
-                onChange={(e) => setNuevoArchivo(e.target.files[0])}
-                className="w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:text-xs file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
-              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <select
+                  value={tipoDocumentoSubida}
+                  onChange={(e) => setTipoDocumentoSubida(e.target.value)}
+                  className="rounded-sm border border-stone p-2 text-xs bg-white text-ink focus:border-copper focus:outline-none"
+                >
+                  {TIPOS_DOCUMENTOS_OBLIGATORIOS.map((t) => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
+                </select>
+
+                <input
+                  type="file"
+                  onChange={(e) => setNuevoArchivo(e.target.files[0])}
+                  className="w-full text-xs text-ink/70 file:mr-2 file:py-2 file:px-3 file:rounded-sm file:border-0 file:text-xs file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
+                />
+              </div>
+
               <button
                 type="submit"
                 disabled={!nuevoArchivo || subiendoArchivo}
-                className="w-full rounded-sm bg-taller py-2 text-xs font-medium text-paper hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                className="w-full rounded-sm bg-taller py-2.5 text-xs font-medium text-paper hover:opacity-90 disabled:opacity-50 cursor-pointer"
               >
-                {subiendoArchivo ? "Subiendo archivo..." : "Subir archivo y enviar a revisión"}
+                {subiendoArchivo ? "Subiendo archivo y notificando..." : "Subir archivo y enviar a revisión"}
               </button>
             </form>
           </div>

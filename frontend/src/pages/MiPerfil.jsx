@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../api/supabaseClient.js";
 
+// =========================================================================
+// CONFIGURACIÓN DE CONTACTO DE WHATSAPP DEL ADMIN
+// =========================================================================
+const NUMERO_WHATSAPP_ADMIN = "5492216110999";
+
 export default function MiPerfil() {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -16,10 +21,19 @@ export default function MiPerfil() {
   });
   
   const [rubros, setRubros] = useState([]);
-  const [rubroSeleccionado, setRubroSeleccionado] = useState("");
-  const [archivosStorage, setArchivosStorage] = useState([]);
-  const [nuevoArchivo, setNuevoArchivo] = useState(null);
-  const [subiendoArchivo, setSubiendoArchivo] = useState(false);
+  const [rubrosSeleccionados, setRubrosSeleccionados] = useState([]);
+  
+  // Definición de etiquetas fijas para los documentos requeridos
+  const TIPOS_DOCUMENTOS_OBLIGATORIOS = [
+    { id: "dni_frente", label: "DNI (Frente)" },
+    { id: "dni_dorso", label: "DNI (Dorso)" },
+    { id: "matricula", label: "Matrícula / Certificado" },
+    { id: "adicional", label: "Documento Adicional / CV" }
+  ];
+
+  const [documentosProfesional, setDocumentosProfesional] = useState({});
+  const [archivosSeleccionados, setArchivosSeleccionados] = useState({});
+  const [subiendoTipo, setSubiendoTipo] = useState(null);
 
   // Estados para cambiar contraseña y los ojitos
   const [mostrarModalPassword, setMostrarModalPassword] = useState(false);
@@ -40,6 +54,20 @@ export default function MiPerfil() {
       if (!error && data) setRubros(data);
     } catch (err) {
       console.error("Error al cargar rubros:", err);
+    }
+  }
+
+  function capitalizarTexto(texto) {
+    if (!texto) return "";
+    const textoLimpio = texto.trim().toLowerCase();
+    return textoLimpio.charAt(0).toUpperCase() + textoLimpio.slice(1);
+  }
+
+  function handleCheckboxRubro(rubroId) {
+    if (rubrosSeleccionados.includes(rubroId)) {
+      setRubrosSeleccionados(rubrosSeleccionados.filter(id => id !== rubroId));
+    } else {
+      setRubrosSeleccionados([...rubrosSeleccionados, rubroId]);
     }
   }
 
@@ -64,7 +92,7 @@ export default function MiPerfil() {
         .single();
 
       if (data) {
-        setPerfil({
+        const perfilObj = {
           nombre_completo: data.nombre_completo || data.nombre || "",
           whatsapp: data.whatsapp || data.telefono || "",
           direccion: data.direccion || "",
@@ -75,10 +103,12 @@ export default function MiPerfil() {
           estado: data.estado || "pendiente",
           id: data.id,
           email: data.email
-        });
+        };
+        setPerfil(perfilObj);
 
         if (data.profesional_rubros && data.profesional_rubros.length > 0) {
-          setRubroSeleccionado(data.profesional_rubros[0].rubros.id);
+          const idsAsociados = data.profesional_rubros.map(item => item.rubros.id);
+          setRubrosSeleccionados(idsAsociados);
         }
 
         await listarArchivosStorage(data.id, data.email);
@@ -98,11 +128,25 @@ export default function MiPerfil() {
           file.name.includes(profesionalId) || 
           (email && file.name.toLowerCase().includes(email.toLowerCase().split('@')[0]))
         );
-        const conUrl = matches.map(file => {
-          const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(file.name);
-          return { nombre: file.name, url: urlData.publicUrl };
+
+        const docsMapeados = {};
+
+        TIPOS_DOCUMENTOS_OBLIGATORIOS.forEach(tipo => {
+          // Buscamos archivos que contengan exactamente el ID del tipo (ej: dni_dorso)
+          const archivoEncontrado = matches.find(file => file.name.includes(`-${tipo.id}-`) || file.name.includes(tipo.id));
+
+          if (archivoEncontrado) {
+            const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(archivoEncontrado.name);
+            docsMapeados[tipo.id] = {
+              nombreArchivo: archivoEncontrado.name,
+              url: urlData.publicUrl
+            };
+          } else {
+            docsMapeados[tipo.id] = null; 
+          }
         });
-        setArchivosStorage(conUrl);
+
+        setDocumentosProfesional(docsMapeados);
       }
     } catch (err) {
       console.error("Error al listar archivos:", err);
@@ -131,9 +175,14 @@ export default function MiPerfil() {
 
       if (error) throw error;
 
-      if (rubroSeleccionado) {
-        await supabase.from('profesional_rubros').delete().eq('profesional_id', perfil.id);
-        await supabase.from('profesional_rubros').insert([{ profesional_id: perfil.id, rubro_id: rubroSeleccionado }]);
+      await supabase.from('profesional_rubros').delete().eq('profesional_id', perfil.id);
+      
+      if (rubrosSeleccionados.length > 0) {
+        const nuevasRelaciones = rubrosSeleccionados.map(rId => ({
+          profesional_id: perfil.id,
+          rubro_id: rId
+        }));
+        await supabase.from('profesional_rubros').insert(nuevasRelaciones);
       }
 
       alert("¡Cambios guardados correctamente!");
@@ -144,44 +193,72 @@ export default function MiPerfil() {
     }
   }
 
-  async function handleSubirDocumento(e) {
-    e.preventDefault();
-    if (!nuevoArchivo) {
-      alert("Seleccioná un archivo primero.");
+  // Subir documento individual reemplazando el anterior si ya existía uno viejo
+  async function handleSubirIndividual(tipoId) {
+    const archivo = archivosSeleccionados[tipoId];
+    if (!archivo) {
+      alert("Primero seleccioná un archivo para este casillero.");
       return;
     }
 
     try {
-      setSubiendoArchivo(true);
-      const nombreArchivo = `${perfil.id}_${Date.now()}_${nuevoArchivo.name}`;
+      setSubiendoTipo(tipoId);
+
+      // 1. Si ya había un archivo previo de este tipo en el storage, lo borramos primero para que no quede obsoleto
+      const documentoAnterior = documentosProfesional[tipoId];
+      if (documentoAnterior && documentoAnterior.nombreArchivo) {
+        await supabase.storage.from('documentos').remove([documentoAnterior.nombreArchivo]);
+      }
+
+      // 2. Subimos el nuevo archivo con nomenclatura limpia y estricta
+      const fileExt = archivo.name.split('.').pop();
+      const nombreArchivo = `${perfil.id}-${tipoId}-${Date.now()}.${fileExt}`;
+      
       const { error: uploadError } = await supabase.storage
         .from('documentos')
-        .upload(nombreArchivo, nuevoArchivo);
+        .upload(nombreArchivo, archivo);
 
       if (uploadError) throw uploadError;
 
+      // 3. Actualizamos el estado del profesional a pendiente
       await supabase
         .from('profesionales')
         .update({ estado: 'pendiente' })
         .eq('id', perfil.id);
 
+      setArchivosSeleccionados(prev => ({ ...prev, [tipoId]: null }));
       setPerfil(prev => ({ ...prev, estado: 'pendiente' }));
-      setNuevoArchivo(null);
-      alert("¡Documento subido con éxito y enviado a revisión!");
+
+      alert("¡Documento subido y actualizado con éxito!");
       await listarArchivosStorage(perfil.id, perfil.email);
     } catch (err) {
       alert("Error al subir el archivo: " + err.message);
     } finally {
-      setSubiendoArchivo(false);
+      setSubiendoTipo(null);
     }
   }
 
-  async function handleEliminarArchivo(nombreArchivo) {
-    if (!window.confirm("¿Estás seguro de eliminar este archivo?")) return;
+  function handleNotificarAdmin() {
+    const nombreProf = perfil.nombre_completo || "Profesional";
+    const mensajeAdmin = `⚠️ *AVISO DE REVISIÓN DE DOCUMENTACIÓN*:\nEl profesional *${nombreProf}* ha actualizado/subido su documentación y solicita revisión en el panel.`;
+    window.open(`https://wa.me/${NUMERO_WHATSAPP_ADMIN}?text=${encodeURIComponent(mensajeAdmin)}`, '_blank');
+  }
+
+  async function handleEliminarArchivo(tipoId) {
+    const docInfo = documentosProfesional[tipoId];
+    if (!docInfo) return;
+
+    if (!window.confirm("¿Estás seguro de eliminar este documento?")) return;
     try {
-      const { error } = await supabase.storage.from('documentos').remove([nombreArchivo]);
+      const { error } = await supabase.storage.from('documentos').remove([docInfo.nombreArchivo]);
       if (error) throw error;
-      alert("Archivo eliminado.");
+      
+      setDocumentosProfesional(prev => ({
+        ...prev,
+        [tipoId]: null
+      }));
+
+      alert("Archivo eliminado correctamente.");
       await listarArchivosStorage(perfil.id, perfil.email);
     } catch (err) {
       alert("Error al eliminar: " + err.message);
@@ -217,7 +294,6 @@ export default function MiPerfil() {
 
   async function handleCerrarSesion() {
     await supabase.auth.signOut();
-    // Redirige a la pantalla de inicio o login y limpia cualquier estado de sesión
     window.location.href = "/"; 
   }
 
@@ -227,7 +303,7 @@ export default function MiPerfil() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8">
-      {/* CABECERA CON BOTONES DE ACCESO RÁPIDO ARRIBA */}
+      {/* CABECERA CON BOTONES DE ACCESO RÁPIDO */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-stone pb-4 gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-ink">Mi Perfil Profesional</h1>
@@ -237,12 +313,14 @@ export default function MiPerfil() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setMostrarModalPassword(!mostrarModalPassword)}
             className="rounded-sm bg-stone/20 border border-stone px-3 py-1.5 text-xs font-medium text-ink hover:bg-stone/30 cursor-pointer transition"
           >
             🔑 Cambiar Clave
           </button>
           <button
+            type="button"
             onClick={handleCerrarSesion}
             className="rounded-sm border border-copper px-3 py-1.5 text-xs font-medium text-copper hover:bg-copper hover:text-white cursor-pointer transition"
           >
@@ -251,7 +329,7 @@ export default function MiPerfil() {
         </div>
       </div>
 
-      {/* DESPLEGABLE / FORMULARIO RÁPIDO PARA CAMBIAR CONTRASEÑA CON OJITOS */}
+      {/* MODAL CAMBIAR CONTRASEÑA */}
       {mostrarModalPassword && (
         <div className="mt-4 rounded-sm border border-copper/40 bg-copper/5 p-4 shadow-xs">
           <h3 className="text-xs font-bold uppercase tracking-wider text-copper mb-2">Modificar contraseña de acceso</h3>
@@ -340,19 +418,23 @@ export default function MiPerfil() {
         </div>
 
         <div>
-          <label className="block text-xs font-medium uppercase tracking-wider text-ink/60 mb-1">Rubro / Oficio</label>
-          <select
-            value={rubroSeleccionado}
-            onChange={(e) => setRubroSeleccionado(e.target.value)}
-            className="w-full rounded-sm border border-stone bg-white px-3 py-2 text-ink focus:border-copper focus:outline-none text-sm"
-          >
-            <option value="" disabled>Seleccioná tu rubro</option>
+          <label className="block text-xs font-medium uppercase tracking-wider text-ink/60 mb-2">
+            Rubros u Oficios (Seleccioná uno o varios)
+          </label>
+          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 bg-stone/5 rounded border border-stone/30">
             {rubros.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1)}
-              </option>
+              <label key={r.id} className="flex items-center gap-2 text-xs text-ink cursor-pointer bg-white p-2 rounded border border-stone/20 hover:border-copper">
+                <input
+                  type="checkbox"
+                  value={r.id}
+                  checked={rubrosSeleccionados.includes(r.id)}
+                  onChange={() => handleCheckboxRubro(r.id)}
+                  className="rounded border-stone text-copper focus:ring-copper"
+                />
+                {capitalizarTexto(r.nombre || r.titulo)}
+              </label>
             ))}
-          </select>
+          </div>
         </div>
 
         <div>
@@ -421,46 +503,91 @@ export default function MiPerfil() {
       {/* GESTIÓN DE DOCUMENTACIÓN */}
       <div className="mt-8 rounded-sm border border-stone/40 bg-white p-6 shadow-xs">
         <h3 className="text-xs font-bold uppercase tracking-wider text-copper">Gestión de Documentación</h3>
-        <p className="text-xs text-ink/60 mt-1">Visualizá tus documentos actuales, eliminalos si están desactualizados o subí un archivo nuevo para reactivar tu cuenta.</p>
+        <p className="text-xs text-ink/60 mt-1">Cargá de forma independiente los documentos que tengas pendientes. Al finalizar, enviá el aviso al administrador.</p>
 
-        <div className="mt-4 space-y-2">
-          {archivosStorage.length === 0 ? (
-            <p className="text-xs text-ink/40 italic">No hay archivos vinculados.</p>
-          ) : (
-            archivosStorage.map((file, idx) => (
-              <div key={idx} className="flex items-center justify-between rounded-sm border border-stone/30 p-2 bg-stone/5">
-                <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-ink hover:underline truncate max-w-[70%]">
-                  📄 {file.nombre}
-                </a>
-                <button
-                  type="button"
-                  onClick={() => handleEliminarArchivo(file.nombre)}
-                  className="rounded-sm bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200 cursor-pointer"
-                >
-                  Eliminar
-                </button>
+        <div className="mt-4 space-y-3">
+          {TIPOS_DOCUMENTOS_OBLIGATORIOS.map((tipo) => {
+            const doc = documentosProfesional[tipo.id];
+            const archivoSeleccionadoParaEste = archivosSeleccionados[tipo.id];
+            const estaSubiendoEste = subiendoTipo === tipo.id;
+
+            return (
+              <div key={tipo.id} className="rounded-sm border border-stone/30 p-3 bg-stone/5 space-y-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-ink min-w-[150px] uppercase">
+                      {tipo.label}:
+                    </span>
+                    {doc ? (
+                      <span className="text-xs text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded">
+                        ✓ Cargado
+                      </span>
+                    ) : (
+                      <span className="text-xs text-amber-700 font-medium bg-amber-50 px-2 py-0.5 rounded italic">
+                        Casillero vacío (disponible)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {doc && (
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-sm bg-stone/20 px-3 py-1 text-xs font-medium text-ink hover:bg-stone/30 border border-stone cursor-pointer"
+                      >
+                        Ver
+                      </a>
+                    )}
+
+                    {doc && (
+                      <button
+                        type="button"
+                        onClick={() => handleEliminarArchivo(tipo.id)}
+                        className="rounded-sm bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200 cursor-pointer"
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Selector individual para rellenar o actualizar el casillero */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-stone/20">
+                  <input
+                    type="file"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      setArchivosSeleccionados(prev => ({ ...prev, [tipo.id]: file }));
+                    }}
+                    className="text-xs text-ink file:mr-2 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-xs file:font-semibold file:bg-stone/20 file:text-ink hover:file:bg-stone/30 cursor-pointer w-full sm:w-auto"
+                  />
+                  <button
+                    type="button"
+                    disabled={!archivoSeleccionadoParaEste || estaSubiendoEste}
+                    onClick={() => handleSubirIndividual(tipo.id)}
+                    className="rounded-sm bg-taller px-4 py-1.5 text-xs font-medium text-paper hover:opacity-90 cursor-pointer transition disabled:opacity-40 shrink-0"
+                  >
+                    {estaSubiendoEste ? "Actualizando..." : (doc ? "Actualizar este archivo" : "Subir este archivo")}
+                  </button>
+                </div>
               </div>
-            ))
-          )}
+            );
+          })}
         </div>
 
-        <form onSubmit={handleSubirDocumento} className="mt-6 border-t border-stone/20 pt-4">
-          <label className="block text-xs font-bold uppercase tracking-wider text-ink/70 mb-2">Subir nuevo documento de actualización</label>
-          <div className="flex items-center gap-3">
-            <input
-              type="file"
-              onChange={(e) => setNuevoArchivo(e.target.files[0])}
-              className="text-xs text-ink file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:text-xs file:font-semibold file:bg-stone/20 file:text-ink hover:file:bg-stone/30 cursor-pointer"
-            />
-          </div>
+        {/* BOTÓN GENERAL PARA AVISAR AL ADMIN POR WHATSAPP */}
+        <div className="mt-6 border-t border-stone/20 pt-4 text-center">
+          <p className="text-xs text-ink/60 mb-3">¿Ya terminaste de actualizar tus documentos? Enviá el aviso definitivo al administrador.</p>
           <button
-            type="submit"
-            disabled={subiendoArchivo || !nuevoArchivo}
-            className="mt-3 w-full rounded-sm bg-taller py-2 text-xs font-medium text-paper hover:opacity-90 cursor-pointer shadow-xs transition disabled:opacity-50"
+            type="button"
+            onClick={handleNotificarAdmin}
+            className="w-full rounded-sm bg-emerald-600 py-2.5 text-xs font-medium text-white hover:bg-emerald-700 cursor-pointer shadow-xs transition"
           >
-            {subiendoArchivo ? "Subiendo..." : "Subir archivo y enviar a revisión"}
+            📲 Notificar al Administrador por WhatsApp (Revisión Completa)
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );

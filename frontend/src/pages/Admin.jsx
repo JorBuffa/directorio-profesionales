@@ -65,13 +65,11 @@ export default function Admin() {
       }
 
       try {
-        // Listamos todos los archivos del bucket para ver qué hay o buscar por ID/Email
         const { data, error } = await supabase.storage
           .from('documentos')
           .list('', { limit: 100 });
 
         if (!error && data) {
-          // Filtramos los archivos que coincidan con el ID del usuario o su email
           const matches = data.filter(file => 
             file.name.includes(seleccionada.id) || 
             (seleccionada.email && file.name.toLowerCase().includes(seleccionada.email.toLowerCase().split('@')[0]))
@@ -100,10 +98,11 @@ export default function Admin() {
     obtenerArchivos();
   }, [seleccionada]);
 
-  async function cambiarEstado(id, nuevoEstado, requiereMotivo = false) {
+  async function cambiarEstado(profesional, nuevoEstado, requiereMotivo = false) {
     let motivo = "";
     if (requiereMotivo) {
-      motivo = window.prompt("Ingrese el motivo:") || "";
+      motivo = window.prompt("Ingrese el motivo:") || "No especificado";
+      if (motivo === null) return; // Si cancela el prompt, no hace nada
     }
 
     try {
@@ -115,9 +114,20 @@ export default function Admin() {
       const { error } = await supabase
         .from('profesionales')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', profesional.id);
 
       if (error) throw error;
+
+      // Si se rechazó o suspendió y tiene teléfono/whatsapp, disparamos el mensaje automático
+      if ((nuevoEstado === 'rechazado') && (profesional.whatsapp || profesional.telefono)) {
+        const tel = profesional.whatsapp || profesional.telefono;
+        const nombreProf = profesional.nombre_completo || profesional.nombre || "Profesional";
+        const mensaje = `Hola *${nombreProf}*, nos comunicamos desde *ConectaOficios*. Te informamos que tu perfil ha sido suspendido / rechazado por el siguiente motivo: _${motivo}_. Por favor, revisa los datos o la documentación solicitada para poder reactivarlo. ¡Muchas gracias!`;
+        
+        const urlWhatsApp = `https://wa.me/${tel}?text=${encodeURIComponent(mensaje)}`;
+        window.open(urlWhatsApp, '_blank');
+      }
+
       cargar();
     } catch (err) {
       alert("Error al actualizar el estado: " + err.message);
@@ -184,13 +194,13 @@ export default function Admin() {
                 {tab === "pendiente" && (
                   <>
                     <button
-                      onClick={() => cambiarEstado(seleccionada.id, 'aprobado')}
+                      onClick={() => cambiarEstado(seleccionada, 'aprobado')}
                       className="rounded-sm bg-taller px-4 py-2 text-xs font-medium text-paper hover:opacity-90 cursor-pointer shadow-xs"
                     >
                       Aprobar
                     </button>
                     <button
-                      onClick={() => cambiarEstado(seleccionada.id, 'rechazado', true)}
+                      onClick={() => cambiarEstado(seleccionada, 'rechazado', true)}
                       className="rounded-sm border border-copper px-4 py-2 text-xs font-medium text-copper-dark hover:bg-copper hover:text-paper cursor-pointer shadow-xs"
                     >
                       Rechazar
@@ -200,7 +210,7 @@ export default function Admin() {
 
                 {tab === "aprobado" && (
                   <button
-                    onClick={() => cambiarEstado(seleccionada.id, 'rechazado', true)}
+                    onClick={() => cambiarEstado(seleccionada, 'rechazado', true)}
                     className="rounded-sm bg-red-600 px-4 py-2 text-xs font-medium text-white hover:bg-red-700 cursor-pointer shadow-xs"
                   >
                     Suspender / Dar de baja
@@ -209,7 +219,7 @@ export default function Admin() {
 
                 {tab === "rechazado" && (
                   <button
-                    onClick={() => cambiarEstado(seleccionada.id, 'aprobado')}
+                    onClick={() => cambiarEstado(seleccionada, 'aprobado')}
                     className="rounded-sm bg-taller px-4 py-2 text-xs font-medium text-paper hover:opacity-90 cursor-pointer shadow-xs"
                   >
                     Reactivar / Aprobar

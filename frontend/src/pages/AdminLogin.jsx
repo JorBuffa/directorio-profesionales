@@ -18,7 +18,7 @@ export default function AdminLogin() {
   const [archivosStorage, setArchivosStorage] = useState([]);
 
   const [rubrosOficiales, setRubrosOficiales] = useState([]);
-  const [rubrosSeleccionados, setRubrosSeleccionados] = useState({});
+  const [rubrosSeleccionados, setRubrosSeleccionados] = useState([]);
 
   // Función para normalizar texto (Primera letra mayúscula, resto minúscula)
   function capitalizarTexto(texto) {
@@ -39,6 +39,16 @@ export default function AdminLogin() {
       cargarRubrosOficiales();
     }
   }, [autenticado, tab]);
+
+  // Cada vez que seleccionamos un profesional, cargamos sus rubros actuales en el estado de checkboxes
+  useEffect(() => {
+    if (seleccionada && seleccionada.profesional_rubros) {
+      const idsActuales = seleccionada.profesional_rubros.map(item => item.rubros?.id).filter(Boolean);
+      setRubrosSeleccionados(idsActuales);
+    } else {
+      setRubrosSeleccionados([]);
+    }
+  }, [seleccionada]);
 
   async function cargarRubrosOficiales() {
     try {
@@ -77,9 +87,23 @@ export default function AdminLogin() {
             const { data: urlData } = supabase.storage
               .from('documentos')
               .getPublicUrl(file.name);
+            
+            // Detectar la extensión para saber qué icono o comportamiento mostrar
+            const extension = file.name.split('.').pop().toLowerCase();
+            let tipoIcono = "📁";
+            if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(extension)) {
+              tipoIcono = "🖼️";
+            } else if (['pdf'].includes(extension)) {
+              tipoIcono = "📄";
+            } else if (['doc', 'docx', 'txt'].includes(extension)) {
+              tipoIcono = "📝";
+            }
+
             return {
               nombre: file.name,
-              url: urlData.publicUrl
+              url: urlData.publicUrl,
+              extension,
+              tipoIcono
             };
           });
 
@@ -114,8 +138,11 @@ export default function AdminLogin() {
 
       if (!error && data) {
         setSolicitudes(data);
-        if (data.length > 0) setSeleccionada(data[0]);
-        else setSeleccionada(null);
+        if (data.length > 0) {
+          setSeleccionada(data[0]);
+        } else {
+          setSeleccionada(null);
+        }
       } else {
         const { data: allData } = await supabase.from('profesionales').select('*');
         if (allData) {
@@ -132,21 +159,16 @@ export default function AdminLogin() {
     }
   }
 
-  function handleCambioRubroLocal(profesionalId, nuevoRubroId) {
-    setRubrosSeleccionados(prev => ({
-      ...prev,
-      [profesionalId]: nuevoRubroId
-    }));
+  function handleCheckboxRubro(rubroId) {
+    if (rubrosSeleccionados.includes(rubroId)) {
+      setRubrosSeleccionados(rubrosSeleccionados.filter(id => id !== rubroId));
+    } else {
+      setRubrosSeleccionados([...rubrosSeleccionados, rubroId]);
+    }
   }
 
-  async function actualizarRubroSeleccionado() {
+  async function guardarRubrosSeleccionados() {
     if (!seleccionada) return;
-    const nuevoRubroId = rubrosSeleccionados[seleccionada.id];
-    
-    if (!nuevoRubroId) {
-      alert("Por favor, selecciona un rubro diferente en el menú desplegable primero.");
-      return;
-    }
 
     try {
       await supabase
@@ -154,18 +176,22 @@ export default function AdminLogin() {
         .delete()
         .eq('profesional_id', seleccionada.id);
 
-      const { error: errorRelacion } = await supabase
-        .from('profesional_rubros')
-        .insert([
-          { profesional_id: seleccionada.id, rubro_id: nuevoRubroId }
-        ]);
+      if (rubrosSeleccionados.length > 0) {
+        const nuevasRelaciones = rubrosSeleccionados.map(rId => ({
+          profesional_id: seleccionada.id,
+          rubro_id: rId
+        }));
+        const { error: errorRelacion } = await supabase
+          .from('profesional_rubros')
+          .insert(nuevasRelaciones);
 
-      if (errorRelacion) throw errorRelacion;
+        if (errorRelacion) throw errorRelacion;
+      }
 
-      alert("¡Rubro actualizado correctamente!");
+      alert("¡Rubros actualizados correctamente!");
       cargarSolicitudes();
     } catch (err) {
-      alert("Error al actualizar el rubro: " + err.message);
+      alert("Error al actualizar los rubros: " + err.message);
     }
   }
 
@@ -181,6 +207,8 @@ export default function AdminLogin() {
       const updateData = { estado: nuevoEstado };
       if (requiereMotivo && motivo) {
         updateData.motivo_rechazo = motivo;
+      } else if (nuevoEstado === 'aprobado') {
+        updateData.motivo_rechazo = null;
       }
 
       let { error } = await supabase
@@ -199,20 +227,38 @@ export default function AdminLogin() {
       }
 
       if (nuevoEstado === 'aprobado') {
-        const rubroNuevoId = rubrosSeleccionados[id];
-        if (rubroNuevoId) {
-          await supabase
-            .from('profesional_rubros')
-            .delete()
-            .eq('profesional_id', id);
+        await supabase
+          .from('profesional_rubros')
+          .delete()
+          .eq('profesional_id', id);
 
-          const { error: errorRelacion } = await supabase
-            .from('profesional_rubros')
-            .insert([
-              { profesional_id: id, rubro_id: rubroNuevoId }
-            ]);
+        if (rubrosSeleccionados.length > 0) {
+          const nuevasRelaciones = rubrosSeleccionados.map(rId => ({
+            profesional_id: id,
+            rubro_id: rId
+          }));
+          await supabase.from('profesional_rubros').insert(nuevasRelaciones);
+        }
+      }
 
-          if (errorRelacion) throw errorRelacion;
+      if (seleccionada) {
+        const tel = seleccionada.whatsapp || seleccionada.telefono;
+        const nombreProf = seleccionada.nombre_completo || seleccionada.nombre || "Profesional";
+        
+        if (tel) {
+          let mensaje = "";
+          if (nuevoEstado === 'rechazado') {
+            mensaje = `Hola *${nombreProf}*, nos comunicamos desde *ConectaOficios*. Te informamos que tu perfil ha sido rechazado / suspendido por el siguiente motivo: _${motivo || "No especificado"}_. Por favor, revisa los datos o la documentación solicitada. ¡Muchas gracias!`;
+          } else if (nuevoEstado === 'aprobado') {
+            mensaje = `Hola *${nombreProf}*, ¡excelente noticia! Nos comunicamos desde *ConectaOficios* para informarte que tu perfil ha sido aprobado / reactivado con éxito. Ya formás parte de nuestra plataforma. ¡Muchas gracias!`;
+          }
+
+          if (mensaje) {
+            const urlWhatsApp = `https://wa.me/${tel}?text=${encodeURIComponent(mensaje)}`;
+            window.open(urlWhatsApp, '_blank');
+          }
+        } else {
+          alert("El estado se actualizó, pero el usuario no tiene cargado un número de teléfono/WhatsApp para notificarlo.");
         }
       }
 
@@ -239,7 +285,6 @@ export default function AdminLogin() {
     }
   }
 
-  // CAMBIO DE CONTRASEÑA DIRECTO DESDE EL PANEL
   async function handleCambiarPasswordDirecto(userId, emailProfesional) {
     if (!userId) {
       alert("No se encontró el ID del usuario.");
@@ -247,7 +292,7 @@ export default function AdminLogin() {
     }
 
     const nuevaPassword = window.prompt(`Escribe la nueva contraseña para ${emailProfesional || 'el usuario'} (mínimo 6 caracteres):`);
-    if (nuevaPassword === null) return; // Si cancela
+    if (nuevaPassword === null) return;
 
     if (nuevaPassword.length < 6) {
       alert("La contraseña debe tener al menos 6 caracteres.");
@@ -256,15 +301,12 @@ export default function AdminLogin() {
 
     try {
       setCargando(true);
-      
-      // Intentamos actualizar directamente usando la función admin de supabase mediante RPC o llamada directa
       const { error } = await supabase.rpc('actualizar_password_usuario', {
         user_id: userId,
         nueva_pass: nuevaPassword
       });
 
       if (error) {
-        // Si la función RPC no existe aún en la base de datos, mostramos una alternativa clara
         console.warn(error);
         alert("Para cambiar la contraseña de forma directa, asegúrate de tener creada la función RPC en Supabase o usa el cambio manual. (Detalle: " + error.message + ")");
       } else {
@@ -388,7 +430,7 @@ export default function AdminLogin() {
             <p className="text-sm text-ink/50">No hay registros en este estado.</p>
           )}
           {solicitudes.map((s) => {
-            const nombreRubroCrudo = s.profesional_rubros?.[0]?.rubros?.nombre || s.categoria || s.localidad || "Sin categoría";
+            const rubrosNombres = s.profesional_rubros?.map(item => capitalizarTexto(item.rubros?.nombre)).filter(Boolean).join(", ") || s.categoria || s.localidad || "Sin categoría";
             return (
               <button
                 key={s.id}
@@ -398,8 +440,8 @@ export default function AdminLogin() {
                 }`}
               >
                 <p className="font-display font-semibold text-ink">{s.nombre_completo || s.nombre}</p>
-                <p className="text-xs uppercase tracking-wide text-taller">
-                  {capitalizarTexto(nombreRubroCrudo)}
+                <p className="text-xs uppercase tracking-wide text-taller truncate">
+                  {rubrosNombres}
                 </p>
                 <p className="mt-1 font-mono text-xs text-ink/40">{s.email}</p>
               </button>
@@ -416,29 +458,32 @@ export default function AdminLogin() {
               <p className="text-sm text-ink/60">{seleccionada.email} · {seleccionada.whatsapp || seleccionada.telefono || "Sin teléfono"}</p>
               <p className="mt-1 text-xs font-mono text-ink/50">Localidad: {seleccionada.localidad || seleccionada.direccion || "No especificada"}</p>
 
+              {/* SECCIÓN DE RUBROS MÚLTIPLES CON CHECKBOXES */}
               <div className="mt-4 bg-stone/5 p-3 rounded border border-stone/30">
-                <label className="block text-xs font-semibold text-ink/70 mb-1">
-                  Rubro actual / Reasignar rubro oficial:
+                <label className="block text-xs font-semibold text-ink/70 mb-2">
+                  Rubros u Oficios seleccionados (podés modificar o tildar varios):
                 </label>
-                <select
-                  defaultValue={seleccionada.profesional_rubros?.[0]?.rubros?.id || ""}
-                  onChange={(e) => handleCambioRubroLocal(seleccionada.id, e.target.value)}
-                  className="w-full rounded-sm border border-stone bg-white px-3 py-1.5 text-xs text-ink focus:border-copper focus:outline-none"
-                >
-                  <option value="" disabled>Seleccioná un rubro oficial</option>
+                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1 bg-white rounded border border-stone/20">
                   {rubrosOficiales.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {capitalizarTexto(r.nombre)} {r.id === seleccionada.profesional_rubros?.[0]?.rubros?.id ? "(Actual)" : ""}
-                    </option>
+                    <label key={r.id} className="flex items-center gap-2 text-xs text-ink cursor-pointer p-1 hover:bg-stone/10 rounded">
+                      <input
+                        type="checkbox"
+                        value={r.id}
+                        checked={rubrosSeleccionados.includes(r.id)}
+                        onChange={() => handleCheckboxRubro(r.id)}
+                        className="rounded border-stone text-copper focus:ring-copper"
+                      />
+                      {capitalizarTexto(r.nombre)}
+                    </label>
                   ))}
-                </select>
+                </div>
 
                 <button
                   type="button"
-                  onClick={actualizarRubroSeleccionado}
-                  className="mt-2 rounded-sm bg-copper px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 cursor-pointer shadow-xs"
+                  onClick={guardarRubrosSeleccionados}
+                  className="mt-3 rounded-sm bg-copper px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 cursor-pointer shadow-xs"
                 >
-                  Guardar nuevo rubro
+                  Guardar selección de rubros
                 </button>
               </div>
 
@@ -451,7 +496,7 @@ export default function AdminLogin() {
                       onClick={() => cambiarEstado(seleccionada.id, 'aprobado')}
                       className="rounded-sm bg-taller px-4 py-2 text-xs font-medium text-paper hover:opacity-90 cursor-pointer shadow-xs"
                     >
-                      Aprobar y Asignar Rubro
+                      Aprobación Completa
                     </button>
                     <button
                       onClick={() => cambiarEstado(seleccionada.id, 'rechazado', true)}
@@ -488,7 +533,6 @@ export default function AdminLogin() {
                   </>
                 )}
 
-                {/* BOTÓN PARA ASIGNAR NUEVA CLAVE DIRECTAMENTE */}
                 <button
                   type="button"
                   onClick={() => handleCambiarPasswordDirecto(seleccionada.user_id || seleccionada.id, seleccionada.email)}
@@ -522,8 +566,11 @@ export default function AdminLogin() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="rounded-sm bg-stone/20 px-3 py-2 text-xs font-medium text-ink hover:bg-stone/30 border border-stone flex items-center gap-1 cursor-pointer"
+                      title={`Archivo: ${file.nombre}`}
                     >
-                      📁 {file.name}
+                      <span>{file.tipoIcono}</span>
+                      <span className="truncate max-w-[140px]">{file.nombre}</span>
+                      <span className="text-[10px] text-ink/50 uppercase font-mono">({file.extension})</span>
                     </a>
                   ))}
 
