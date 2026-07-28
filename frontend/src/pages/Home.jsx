@@ -11,113 +11,116 @@ const categorias = [
 
 export default function Home() {
   return (
-    <div>
-      {/* HERO: grilla de plano técnico + línea de ruta punteada, el elemento
-          firma de la página, conectando un pin de profesional con el usuario. */}
-      <section className="relative overflow-hidden bg-blueprint bg-blueprintGrid bg-grid">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-20 md:grid-cols-2 md:py-28">
+    <div className="bg-paper min-h-screen">
+      {/* HERO: Sección principal rediseñada con alto impacto y botones gigantes */}
+      <section className="bg-blueprint px-4 py-16 md:py-24 text-paper text-center md:text-left border-b-4 border-copper">
+        <div className="mx-auto max-w-5xl grid gap-10 md:grid-cols-2 items-center">
+          
+          {/* Textos y botones de acceso principal */}
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-copper-light">
-              Oficio verificado · a la distancia justa
-            </p>
-            <h1 className="mt-4 font-display text-4xl font-bold leading-[1.05] text-paper md:text-5xl">
-              El profesional que necesitás,
-              <br />
-              <span className="text-copper">a la vuelta de tu casa.</span>
+            <span className="inline-block bg-copper/20 text-copper-light border border-copper/40 px-3 py-1 rounded-full text-xs font-mono tracking-wider uppercase mb-4">
+              Plataforma comunitaria de oficios verificados
+            </span>
+            <h1 className="font-display text-4xl font-extrabold leading-tight md:text-6xl text-paper">
+              Encontrá al profesional que necesitás, <br />
+              <span className="text-copper underline decoration-copper/50 underline-offset-8">a la vuelta de tu casa.</span>
             </h1>
-            <p className="mt-5 max-w-md text-paper/70">
-              Buscá electricistas, plomeros, carpinteros y más de tu zona, con
-              mapa en vivo, distancia real y documentación verificada por
-              nuestro equipo de moderación.
+            <p className="mt-6 text-lg text-paper/90 leading-relaxed max-w-xl">
+              Conectamos vecinos con electricistas, plomeros, albañiles y más de forma rápida, directa y segura. Con mapa en vivo y datos verificados.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+
+            {/* BOTONES GIGANTES Y DESTACADOS PARA FÁCIL ACCESO */}
+            <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
               <Link
                 to="/buscar"
-                className="rounded-sm bg-copper px-6 py-3 font-medium text-paper transition hover:bg-copper-dark"
+                className="rounded-lg bg-copper px-8 py-5 text-center font-bold text-paper text-lg shadow-xl transition hover:bg-copper-dark transform hover:-translate-y-0.5 flex items-center justify-center gap-3"
               >
-                Buscar un profesional
+                <span className="text-2xl">🔍</span>
+                <span>BUSCAR UN PROFESIONAL</span>
               </Link>
+              
               <Link
                 to="/soy-profesional"
-                className="rounded-sm border border-paper/30 px-6 py-3 font-medium text-paper transition hover:border-copper hover:text-copper"
+                className="rounded-lg bg-white/10 border-2 border-paper/60 px-8 py-5 text-center font-bold text-paper text-lg transition hover:bg-white/20 hover:border-paper flex items-center justify-center gap-3"
               >
-                Quiero ofrecer mi oficio
+                <span className="text-2xl">🛠️</span>
+                <span>SOY PROFESIONAL</span>
               </Link>
             </div>
           </div>
 
-          {/* Diagrama de "ruta" tipo plano, con el pin del profesional y el
-              usuario conectados por una línea punteada y una cota de distancia. */}
-          <div className="relative hidden items-center justify-center md:flex">
-            <svg viewBox="0 0 360 280" className="w-full max-w-sm">
-              <circle cx="90" cy="200" r="6" fill="#E28E52" />
-              <circle cx="270" cy="70" r="6" fill="#2B6E5E" />
+          {/* Gráfico o ilustración visual lateral simplificada */}
+          <div className="hidden md:flex justify-center bg-white/5 p-8 rounded-2xl border border-white/10 shadow-inner">
+            <svg viewBox="0 0 360 280" className="w-full max-w-xs drop-shadow-md">
+              <circle cx="90" cy="200" r="10" fill="#E28E52" />
+              <circle cx="270" cy="70" r="10" fill="#2B6E5E" />
               <line
                 x1="90"
                 y1="200"
                 x2="270"
                 y2="70"
-                stroke="#C46A2E"
-                strokeWidth="2"
-                strokeDasharray="6 6"
+                stroke="#E28E52"
+                strokeWidth="4"
+                strokeDasharray="8 8"
               />
-              <text x="60" y="230" fill="#F7F5EF" fontSize="12" fontFamily="JetBrains Mono">
-                vos
+              <text x="60" y="235" fill="#F7F5EF" fontSize="16" fontWeight="bold" fontFamily="sans-serif">
+                📍 Vos
               </text>
-              <text x="245" y="55" fill="#F7F5EF" fontSize="12" fontFamily="JetBrains Mono">
-                profesional
+              <text x="230" y="45" fill="#F7F5EF" fontSize="16" fontWeight="bold" fontFamily="sans-serif">
+                👷 Profesional
               </text>
-              <text x="150" y="120" fill="#E28E52" fontSize="13" fontFamily="JetBrains Mono">
+              <text x="145" y="125" fill="#E28E52" fontSize="16" fontWeight="bold" fontFamily="sans-serif">
                 1.4 km
               </text>
             </svg>
           </div>
+
         </div>
       </section>
 
-      {/* Categorías: numeradas como cotas de plano, no como "01/02/03" genérico */}
-      <section className="mx-auto max-w-6xl px-4 py-16">
-        <h2 className="font-display text-2xl font-bold text-ink">Oficios disponibles</h2>
+      {/* SECCIÓN DE PASOS MUY CLARA */}
+      <section className="bg-stone/20 py-12 border-b border-stone">
+        <div className="mx-auto max-w-5xl px-4">
+          <h2 className="text-center font-display text-2xl font-bold text-ink mb-8">
+            ¿Cómo funciona en 3 simples pasos?
+          </h2>
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="bg-white p-6 rounded-lg border border-stone shadow-sm text-center">
+              <span className="inline-block w-12 h-12 leading-12 rounded-full bg-copper text-paper font-bold text-xl mb-4">1</span>
+              <h3 className="font-bold text-ink text-lg">Buscás</h3>
+              <p className="mt-2 text-sm text-ink/70">Ingresás tu nombre y seleccionás el oficio que necesitás.</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg border border-stone shadow-sm text-center">
+              <span className="inline-block w-12 h-12 leading-12 rounded-full bg-copper text-paper font-bold text-xl mb-4">2</span>
+              <h3 className="font-bold text-ink text-lg">Comparás</h3>
+              <p className="mt-2 text-sm text-ink/70">Ves los profesionales ordenados por cercanía real en el mapa.</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg border border-stone shadow-sm text-center">
+              <span className="inline-block w-12 h-12 leading-12 rounded-full bg-copper text-paper font-bold text-xl mb-4">3</span>
+              <h3 className="font-bold text-ink text-lg">Contactás</h3>
+              <p className="mt-2 text-sm text-ink/70">Te comunicás directamente para coordinar el trabajo de forma ágil.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Categorías Disponibles */}
+      <section className="mx-auto max-w-5xl px-4 py-16">
+        <h2 className="font-display text-2xl font-bold text-ink text-center md:text-left">
+          Principales Oficios Disponibles
+        </h2>
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-6">
           {categorias.map((c) => (
             <div
               key={c.nombre}
-              className="rounded-sm border border-stone bg-white p-4 transition hover:border-copper"
+              className="rounded-lg border-2 border-stone bg-white p-5 text-center transition hover:border-copper shadow-sm hover:shadow-md"
             >
-              <p className="font-mono text-xs text-taller">{c.medida}</p>
-              <p className="mt-1 font-medium text-ink">{c.nombre}</p>
+              <p className="font-mono text-xs font-bold text-copper">{c.medida}</p>
+              <p className="mt-2 font-bold text-ink text-base">{c.nombre}</p>
             </div>
           ))}
         </div>
       </section>
-
-      <section className="bg-blueprint-light/5 border-y border-stone py-16">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 md:grid-cols-3">
-          <Paso numero="1" titulo="Buscás" texto="Ingresá tu ubicación y el oficio que necesitás." />
-          <Paso
-            numero="2"
-            titulo="Comparás"
-            texto="Vas viendo profesionales ordenados por distancia real en el mapa."
-          />
-          <Paso
-            numero="3"
-            titulo="Contactás"
-            texto="Elegís al profesional verificado y coordinás directamente."
-          />
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function Paso({ numero, titulo, texto }) {
-  return (
-    <div className="flex gap-4">
-      <span className="font-mono text-2xl font-bold text-copper">{numero}</span>
-      <div>
-        <h3 className="font-display font-semibold text-ink">{titulo}</h3>
-        <p className="mt-1 text-sm text-ink/60">{texto}</p>
-      </div>
     </div>
   );
 }

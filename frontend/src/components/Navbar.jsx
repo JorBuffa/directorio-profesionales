@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import isotipo from "../assets/isotipo.jpg"; // Asegurate que la imagen esté en src/assets/isotipo.jpg (o .png)
 
 const linkClasses = ({ isActive }) =>
   `px-3 py-2 text-sm font-medium transition-colors ${
@@ -10,11 +11,21 @@ export default function Navbar() {
   const { user, logout } = useAuth();
 
   return (
-    <header className="bg-blueprint sticky top-0 z-40 border-b border-blueprint-line">
+    <header className="bg-blueprint sticky top-0 z-40 border-b border-blueprint-line shadow-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <NavLink to="/" className="flex items-center gap-2 font-display text-lg font-bold text-paper">
-          <span className="grid h-8 w-8 place-items-center rounded-sm bg-copper text-paper">CO</span>
-          ConectaOficios
+        
+        {/* LOGO E ISOTIPO ADAPTADO */}
+        <NavLink to="/" className="flex items-center gap-3 font-display text-lg font-bold text-paper group">
+          <div className="w-10 h-10 rounded-full bg-paper flex items-center justify-center p-1 shadow-inner border border-copper/40 overflow-hidden">
+            <img 
+              src={isotipo} 
+              alt="ConectaOficios Isotipo" 
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <span className="group-hover:text-copper transition">
+            ConectaOficios
+          </span>
         </NavLink>
 
         <nav className="flex items-center gap-1">

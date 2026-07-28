@@ -217,16 +217,17 @@ export default function Buscar() {
       {/* PASO 3 */}
       {paso === "resultados" && (
         <div>
-          <div className="flex items-center justify-between border-b border-stone pb-4">
+          {/* Cabecera adaptada con botón grande y llamativo */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-stone pb-4 gap-4">
             <div>
               <h1 className="font-display text-2xl font-bold text-ink">Profesionales más cercanos</h1>
               <p className="text-sm text-ink/60">Resultados ordenados por cercanía para <strong>{nombreCliente}</strong>.</p>
             </div>
             <button
               onClick={() => setPaso("rubros")}
-              className="rounded-sm border border-stone bg-white px-4 py-2 text-xs font-medium text-ink hover:border-copper cursor-pointer"
+              className="w-full sm:w-auto rounded-xl bg-copper px-5 py-3 text-sm font-bold text-paper shadow-md hover:bg-copper/90 transition flex items-center justify-center gap-2 cursor-pointer"
             >
-              Elegir otro rubro
+              🔍 Elegir otro rubro
             </button>
           </div>
 
