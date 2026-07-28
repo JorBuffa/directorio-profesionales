@@ -3,6 +3,27 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../api/supabaseClient.js";
 import MapView from "../components/MapView.jsx";
 
+// Diccionario inteligente para interpretar problemas cotidianos (Ej: "canilla" -> "plomero")
+const diccionarioRubros = {
+  plomero: ["canilla", "agua", "fuga", "pérdida", "inodoro", "tubo", "caño", "desagüe", "gotera", "tanque", "bomba", "plomeria"],
+  gasista: ["gas", "estufa", "calefón", "termotanque", "cocina", "fuga de gas", "valvula", "medidor"],
+  electricista: ["luz", "corto", "enchufes", "foco", "térmica", "disyuntor", "cable", "apagón", "electricidad", "toma", "corriente"],
+  albanil: ["pared", "humedad", "piso", "techo", "revoque", "ladrillo", "cemento", "grieta", "ampliación", "construccion"],
+  pintor: ["pintura", "paredes", "humedad", "impermeabilizar", "latex", "manchas", "cielorraso", "pintar"]
+};
+
+function interpretarBusqueda(textoIngresado) {
+  if (!textoIngresado) return "";
+  const textoMinuscula = textoIngresado.toLowerCase();
+  for (const [rubro, palabrasClave] of Object.entries(diccionarioRubros)) {
+    const coincide = palabrasClave.some(palabra => textoMinuscula.includes(palabra));
+    if (coincide) {
+      return rubro;
+    }
+  }
+  return textoIngresado;
+}
+
 // Función para calcular la distancia en kilómetros (Haversine)
 function calcularDistancia(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return null;
@@ -17,7 +38,7 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-// Función auxiliar para formatear el texto (Primera letra mayúscula, resto minúsculas)
+// Función auxiliar para formatear el texto
 function capitalizarTexto(texto) {
   if (!texto) return "";
   const limpio = texto.trim();
@@ -35,6 +56,10 @@ export default function Buscar() {
   const [rubroSeleccionado, setRubroSeleccionado] = useState(null);
   const [profesionales, setProfesionales] = useState([]);
   const [cargando, setCargando] = useState(false);
+
+  // Estados para el Buscador Inteligente por Texto / Voz
+  const [textoBusquedaLibre, setTextoBusquedaLibre] = useState("");
+  const [escuchandoVoz, setEscuchandoVoz] = useState(false);
 
   useEffect(() => {
     async function cargarDatosIniciales() {
@@ -100,6 +125,59 @@ export default function Buscar() {
     }
   }
 
+  // Función para manejar la búsqueda inteligente por texto o voz
+  function handleBusquedaInteligenteSubmit(e) {
+    if (e) e.preventDefault();
+    if (!textoBusquedaLibre.trim()) return;
+
+    // Interpretamos el problema (ej: "se me rompió la canilla" -> "plomero")
+    const intencion = interpretarBusqueda(textoBusquedaLibre);
+    
+    // Buscamos dentro de los rubros cargados si alguno coincide con la intención
+    const rubroEncontrado = rubros.find(r => 
+      r.nombre.toLowerCase().includes(intencion.toLowerCase())
+    );
+
+    if (rubroEncontrado) {
+      handleSeleccionarRubro(rubroEncontrado.id);
+    } else {
+      alert(`No encontramos un rubro directo para "${textoBusquedaLibre}". Por favor selecciona un rubro de la lista o intenta otra descripción.`);
+    }
+  }
+
+  // Activar micrófono nativo del navegador
+  function iniciarEscuchaDeVoz() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      alert("Tu navegador no soporta búsqueda por voz. Por favor escribe tu consulta.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "es-AR";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setEscuchandoVoz(true);
+    recognition.onresult = (event) => {
+      const transcripcion = event.results[0][0].transcript;
+      setTextoBusquedaLibre(transcripcion);
+      setEscuchandoVoz(false);
+      
+      // Auto-ejecutar búsqueda con el texto interpretado de la voz
+      const intencion = interpretarBusqueda(transcripcion);
+      const rubroEncontrado = rubros.find(r => r.nombre.toLowerCase().includes(intencion.toLowerCase()));
+      if (rubroEncontrado) {
+        handleSeleccionarRubro(rubroEncontrado.id);
+      }
+    };
+    recognition.onerror = () => setEscuchandoVoz(false);
+    recognition.onend = () => setEscuchandoVoz(false);
+
+    recognition.start();
+  }
+
   // Asignar coordenadas válidas y cercanas si el profesional no las tiene guardadas en la BD
   const profesionalesFiltrados = profesionales
     .filter(p => p.profesional_rubros?.some(pr => pr.rubros?.id === rubroSeleccionado))
@@ -162,7 +240,6 @@ export default function Buscar() {
             </form>
           </div>
 
-          {/* Recuadro visible de Términos y Condiciones debajo del formulario */}
           <div className="w-full max-w-md mt-4 rounded-sm border border-stone/60 bg-stone/10 p-3 text-center">
             <p className="text-[11px] text-ink/70 leading-snug">
               Al continuar, aceptás nuestros{" "}
@@ -178,17 +255,57 @@ export default function Buscar() {
         </div>
       )}
 
-      {/* PASO 2 */}
+      {/* PASO 2: SELECCIONAR RUBRO + BUSCADOR INTELIGENTE POR VOZ/TEXTO */}
       {paso === "rubros" && (
         <div>
           <div className="flex items-center justify-between border-b border-stone pb-4">
             <div>
               <h1 className="font-display text-2xl font-bold text-ink">Seleccioná un rubro</h1>
-              <p className="text-sm text-ink/60">Hola, <strong>{nombreCliente}</strong>. Elegí el servicio que necesitás:</p>
+              <p className="text-sm text-ink/60">Hola, <strong>{nombreCliente}</strong>. Elegí el servicio que necesitás o describelo:</p>
             </div>
             <button onClick={() => setPaso("datos")} className="text-xs text-copper hover:underline cursor-pointer">
               Cambiar mis datos
             </button>
+          </div>
+
+          {/* BUSCADOR INTELIGENTE POR TEXTO O VOZ */}
+          <div className="mt-6 bg-copper/5 border border-copper/30 p-4 rounded-sm max-w-xl mx-auto">
+            <label className="block text-xs font-bold uppercase tracking-wider text-copper mb-1">
+              ✨ Búsqueda inteligente por voz o palabras clave
+            </label>
+            <p className="text-[11px] text-ink/70 mb-3">
+              Escribí o decí tu problema (Ej. <em>"Se me rompió la canilla"</em> o <em>"No tengo luz"</em>) y te conectamos al instante.
+            </p>
+            <form onSubmit={handleBusquedaInteligenteSubmit} className="relative flex items-center">
+              <input
+                type="text"
+                value={textoBusquedaLibre}
+                onChange={(e) => setTextoBusquedaLibre(e.target.value)}
+                placeholder="¿Qué problema tenés para arreglar?"
+                className="w-full rounded-sm border border-stone bg-white px-3 py-2.5 pr-20 text-ink focus:border-copper focus:outline-none text-xs"
+              />
+              <button
+                type="button"
+                onClick={iniciarEscuchaDeVoz}
+                title="Buscar hablando"
+                className={`absolute right-10 inset-y-0 px-2 flex items-center justify-center transition cursor-pointer text-base ${
+                  escuchandoVoz ? "text-red-600 animate-pulse scale-110" : "text-ink/60 hover:text-copper"
+                }`}
+              >
+                🎤
+              </button>
+              <button
+                type="submit"
+                className="absolute right-1 inset-y-1 bg-copper text-paper px-2.5 rounded-sm text-xs font-bold hover:opacity-90 cursor-pointer"
+              >
+                Ir
+              </button>
+            </form>
+            {escuchandoVoz && (
+              <p className="text-[10px] text-red-600 mt-1 font-semibold animate-pulse text-center">
+                🔴 Escuchando... Habla cerca de tu micrófono.
+              </p>
+            )}
           </div>
 
           <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
@@ -217,7 +334,6 @@ export default function Buscar() {
       {/* PASO 3: MAPA ARRIBA Y LISTADO DEBAJO */}
       {paso === "resultados" && (
         <div className="space-y-6">
-          {/* Cabecera adaptada con botón grande y llamativo */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-stone pb-4 gap-4">
             <div>
               <h1 className="font-display text-2xl font-bold text-ink">Profesionales más cercanos</h1>
@@ -262,7 +378,6 @@ export default function Buscar() {
                           {p.direccion}, {p.localidad || "Unquillo"}
                         </p>
 
-                        {/* Descripción de los servicios del profesional */}
                         {p.descripcion && (
                           <p className="text-xs text-ink/80 mt-2 bg-stone/5 p-2 rounded-sm border border-stone/30">
                             <strong>Servicios:</strong> {p.descripcion}
