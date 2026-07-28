@@ -224,7 +224,10 @@ export default function SoyProfesional() {
       async function subirArchivo(file, nombrePrefijo) {
         if (!file || !userId) return null;
         const fileExt = file.name.split('.').pop();
-        const fileName = `${userId}-${nombrePrefijo}-${Math.random()}.${fileExt}`;
+        
+        // Guardamos el archivo dentro de una carpeta con el ID del usuario
+        const fileName = `${userId}/${userId}-${nombrePrefijo}-${Math.random()}.${fileExt}`;
+        
         const { error: uploadError } = await supabase.storage
           .from('documentos')
           .upload(fileName, file);
