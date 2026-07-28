@@ -1,174 +1,174 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "../api/supabaseClient.js";
 
 export default function MiPerfil() {
-  const navigate = useNavigate();
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
-  const [geocodificando, setGeocodificando] = useState(false);
-  const [mensaje, setMensaje] = useState("");
-
-  // Listas y datos del perfil
-  const [userIdLogueado, setUserIdLogueado] = useState(null);
-  const [listaRubros, setListaRubros] = useState([]);
-  const [nombreCompleto, setNombreCompleto] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
-  const [rubroIdSeleccionado, setRubroIdSeleccionado] = useState("");
-  const [direccion, setDireccion] = useState("");
-  const [localidad, setLocalidad] = useState("");
-  const [latitud, setLatitud] = useState("");
-  const [longitud, setLongitud] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [estado, setEstado] = useState("");
-
-  // Estados para la gestión de archivos adjuntos del Storage
+  const [perfil, setPerfil] = useState({
+    nombre_completo: "",
+    whatsapp: "",
+    direccion: "",
+    localidad: "",
+    latitud: "",
+    longitud: "",
+    descripcion: "",
+    estado: ""
+  });
+  
+  const [rubros, setRubros] = useState([]);
+  const [rubroSeleccionado, setRubroSeleccionado] = useState("");
   const [archivosStorage, setArchivosStorage] = useState([]);
   const [nuevoArchivo, setNuevoArchivo] = useState(null);
   const [subiendoArchivo, setSubiendoArchivo] = useState(false);
 
+  // Estados para cambiar contraseña y los ojitos
+  const [mostrarModalPassword, setMostrarModalPassword] = useState(false);
+  const [nuevaPassword, setNuevaPassword] = useState("");
+  const [confirmarPassword, setConfirmarPassword] = useState("");
+  const [verNuevaPass, setVerNuevaPass] = useState(false);
+  const [verConfirmarPass, setVerConfirmarPass] = useState(false);
+  const [guardandoPassword, setGuardandoPassword] = useState(false);
+
   useEffect(() => {
-    async function cargarDatosPerfil() {
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !session) {
-          navigate("/soy-profesional");
-          return;
-        }
-
-        const userId = session.user.id;
-        setUserIdLogueado(userId);
-
-        // 1. Cargar todos los rubros disponibles para el selector
-        const { data: rubrosData } = await supabase.from("rubros").select("*");
-        if (rubrosData) setListaRubros(rubrosData);
-
-        // 2. Cargar datos del profesional
-        const { data: profData, error: profError } = await supabase
-          .from("profesionales")
-          .select("*")
-          .eq("id", userId)
-          .single();
-
-        if (profError) {
-          console.error("Error al cargar perfil:", profError);
-        } else if (profData) {
-          setNombreCompleto(profData.nombre_completo || "");
-          setWhatsapp(profData.whatsapp || "");
-          setDireccion(profData.direccion || "");
-          setLocalidad(profData.localidad || "");
-          setLatitud(profData.latitud ?? "");
-          setLongitud(profData.longitud ?? "");
-          setDescripcion(profData.descripcion || "");
-          setEstado(profData.estado || "pendiente");
-        }
-
-        // 3. Cargar el rubro actual de la tabla intermedia profesional_rubros
-        const { data: relData } = await supabase
-          .from("profesional_rubros")
-          .select("rubro_id")
-          .eq("profesional_id", userId)
-          .single();
-
-        if (relData) {
-          setRubroIdSeleccionado(relData.rubro_id);
-        }
-
-        // 4. Cargar documentos del Storage asociados a este usuario
-        await cargarArchivosStorage(userId);
-
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setCargando(false);
-      }
-    }
-
     cargarDatosPerfil();
-  }, [navigate]);
+    cargarRubros();
+  }, []);
 
-  async function cargarArchivosStorage(userId) {
+  async function cargarRubros() {
     try {
-      const { data, error } = await supabase.storage
-        .from('documentos')
-        .list('', { limit: 100 });
-
-      if (!error && data) {
-        // Filtramos los archivos que incluyan el ID del profesional en su nombre
-        const matches = data.filter(file => file.name.includes(userId));
-
-        const archivosConUrl = matches.map((file) => {
-          const { data: urlData } = supabase.storage
-            .from('documentos')
-            .getPublicUrl(file.name);
-          return {
-            nombre: file.name,
-            url: urlData.publicUrl
-          };
-        });
-
-        setArchivosStorage(archivosConUrl);
-      }
+      const { data, error } = await supabase.from('rubros').select('*').order('nombre');
+      if (!error && data) setRubros(data);
     } catch (err) {
-      console.error("Error al listar archivos del storage:", err);
+      console.error("Error al cargar rubros:", err);
     }
   }
 
-  // Borrar un archivo del Storage
-  async function handleEliminarArchivo(nombreArchivo) {
-    if (!window.confirm("¿Estás seguro de querer eliminar este documento?")) return;
-
+  async function cargarDatosPerfil() {
     try {
-      const { error } = await supabase.storage
-        .from('documentos')
-        .remove([nombreArchivo]);
+      setCargando(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('profesionales')
+        .select(`
+          *,
+          profesional_rubros (
+            rubros (
+              id,
+              nombre
+            )
+          )
+        `)
+        .eq('user_id', user.id)
+        .single();
+
+      if (data) {
+        setPerfil({
+          nombre_completo: data.nombre_completo || data.nombre || "",
+          whatsapp: data.whatsapp || data.telefono || "",
+          direccion: data.direccion || "",
+          localidad: data.localidad || "",
+          latitud: data.latitud || "",
+          longitud: data.longitud || "",
+          descripcion: data.descripcion || "",
+          estado: data.estado || "pendiente",
+          id: data.id,
+          email: data.email
+        });
+
+        if (data.profesional_rubros && data.profesional_rubros.length > 0) {
+          setRubroSeleccionado(data.profesional_rubros[0].rubros.id);
+        }
+
+        await listarArchivosStorage(data.id, data.email);
+      }
+    } catch (err) {
+      console.error("Error al cargar perfil:", err);
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  async function listarArchivosStorage(profesionalId, email) {
+    try {
+      const { data, error } = await supabase.storage.from('documentos').list('', { limit: 100 });
+      if (!error && data) {
+        const matches = data.filter(file => 
+          file.name.includes(profesionalId) || 
+          (email && file.name.toLowerCase().includes(email.toLowerCase().split('@')[0]))
+        );
+        const conUrl = matches.map(file => {
+          const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(file.name);
+          return { nombre: file.name, url: urlData.publicUrl };
+        });
+        setArchivosStorage(conUrl);
+      }
+    } catch (err) {
+      console.error("Error al listar archivos:", err);
+    }
+  }
+
+  async function handleGuardarCambios(e) {
+    e.preventDefault();
+    try {
+      setGuardando(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('profesionales')
+        .update({
+          nombre_completo: perfil.nombre_completo,
+          whatsapp: perfil.whatsapp,
+          direccion: perfil.direccion,
+          localidad: perfil.localidad,
+          latitud: perfil.latitud,
+          longitud: perfil.longitud,
+          descripcion: perfil.descripcion
+        })
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
-      setArchivosStorage(prev => prev.filter(f => f.nombre !== nombreArchivo));
-      alert("Documento eliminado correctamente.");
+      if (rubroSeleccionado) {
+        await supabase.from('profesional_rubros').delete().eq('profesional_id', perfil.id);
+        await supabase.from('profesional_rubros').insert([{ profesional_id: perfil.id, rubro_id: rubroSeleccionado }]);
+      }
+
+      alert("¡Cambios guardados correctamente!");
     } catch (err) {
-      alert("Error al eliminar el archivo: " + err.message);
+      alert("Error al guardar los cambios: " + err.message);
+    } finally {
+      setGuardando(false);
     }
   }
 
-  // Subir un nuevo archivo y cambiar el estado a pendiente
-  async function handleSubirNuevoArchivo(e) {
+  async function handleSubirDocumento(e) {
     e.preventDefault();
-    if (!nuevoArchivo || !userIdLogueado) return;
+    if (!nuevoArchivo) {
+      alert("Seleccioná un archivo primero.");
+      return;
+    }
 
-    setSubiendoArchivo(true);
     try {
-      const fileExt = nuevoArchivo.name.split('.').pop();
-      const fileName = `${userIdLogueado}_${Date.now()}.${fileExt}`;
-
+      setSubiendoArchivo(true);
+      const nombreArchivo = `${perfil.id}_${Date.now()}_${nuevoArchivo.name}`;
       const { error: uploadError } = await supabase.storage
         .from('documentos')
-        .upload(fileName, nuevoArchivo);
+        .upload(nombreArchivo, nuevoArchivo);
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
-        .from('documentos')
-        .getPublicUrl(fileName);
+      await supabase
+        .from('profesionales')
+        .update({ estado: 'pendiente' })
+        .eq('id', perfil.id);
 
-      // Actualizamos la base de datos (guardando la URL opcional y pasando estado a 'pendiente')
-      const { error: updateError } = await supabase
-        .from("profesionales")
-        .update({
-          documentacion_url: urlData.publicUrl,
-          estado: 'pendiente'
-        })
-        .eq("id", userIdLogueado);
-
-      if (updateError) throw updateError;
-
-      setEstado('pendiente');
-      alert("¡Documento subido con éxito! Tu perfil fue enviado nuevamente a revisión.");
+      setPerfil(prev => ({ ...prev, estado: 'pendiente' }));
       setNuevoArchivo(null);
-      await cargarArchivosStorage(userIdLogueado);
-
+      alert("¡Documento subido con éxito y enviado a revisión!");
+      await listarArchivosStorage(perfil.id, perfil.email);
     } catch (err) {
       alert("Error al subir el archivo: " + err.message);
     } finally {
@@ -176,259 +176,260 @@ export default function MiPerfil() {
     }
   }
 
-  // Función para buscar coordenadas automáticamente con OpenStreetMap (Nominatim)
-  async function handleUbicarDireccion() {
-    if (!direccion || !localidad) {
-      setMensaje("Por favor completa la dirección y la localidad antes de ubicar.");
-      return;
-    }
-
-    setGeocodificando(true);
-    setMensaje("");
-
+  async function handleEliminarArchivo(nombreArchivo) {
+    if (!window.confirm("¿Estás seguro de eliminar este archivo?")) return;
     try {
-      const query = encodeURIComponent(`${direccion}, ${localidad}, Córdoba, Argentina`);
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`);
-      const data = await response.json();
-
-      if (data && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lon = parseFloat(data[0].lon);
-        setLatitud(lat);
-        setLongitud(lon);
-        setMensaje("¡Ubicación encontrada con éxito! No olvides guardar los cambios.");
-      } else {
-        setMensaje("No se encontró la dirección exacta en el mapa. Prueba ajustando el texto.");
-      }
+      const { error } = await supabase.storage.from('documentos').remove([nombreArchivo]);
+      if (error) throw error;
+      alert("Archivo eliminado.");
+      await listarArchivosStorage(perfil.id, perfil.email);
     } catch (err) {
-      console.error(err);
-      setMensaje("Error al conectar con el servicio de geolocalización.");
-    } finally {
-      setGeocodificando(false);
+      alert("Error al eliminar: " + err.message);
     }
   }
 
-  async function handleActualizar(e) {
+  async function handleCambiarPassword(e) {
     e.preventDefault();
-    setGuardando(true);
-    setMensaje("");
+    if (!nuevaPassword || nuevaPassword.length < 6) {
+      alert("La nueva contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+    if (nuevaPassword !== confirmarPassword) {
+      alert("Las contraseñas no coinciden.");
+      return;
+    }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      setGuardandoPassword(true);
+      const { error } = await supabase.auth.updateUser({ password: nuevaPassword });
+      if (error) throw error;
 
-      const userId = session.user.id;
-
-      // Actualizar datos básicos y coordenadas en 'profesionales'
-      const { error: errorProf } = await supabase
-        .from("profesionales")
-        .update({
-          nombre_completo: nombreCompleto,
-          whatsapp: whatsapp,
-          direccion: direccion,
-          localidad: localidad,
-          latitud: latitud ? parseFloat(latitud) : null,
-          longitud: longitud ? parseFloat(longitud) : null,
-          descripcion: descripcion,
-        })
-        .eq("id", userId);
-
-      if (errorProf) throw errorProf;
-
-      // Actualizar o insertar el rubro en la tabla intermedia 'profesional_rubros'
-      const { data: existingRel } = await supabase
-        .from("profesional_rubros")
-        .select("id")
-        .eq("profesional_id", userId)
-        .single();
-
-      if (existingRel) {
-        await supabase
-          .from("profesional_rubros")
-          .update({ rubro_id: rubroIdSeleccionado })
-          .eq("profesional_id", userId);
-      } else {
-        await supabase
-          .from("profesional_rubros")
-          .insert([{ profesional_id: userId, rubro_id: rubroIdSeleccionado }]);
-      }
-
-      setMensaje("¡Perfil actualizado con éxito!");
+      alert("¡Contraseña actualizada con éxito!");
+      setNuevaPassword("");
+      setConfirmarPassword("");
+      setMostrarModalPassword(false);
     } catch (err) {
-      console.error(err);
-      setMensaje("Error al actualizar: " + (err.message || "Error desconocido"));
+      alert("Error al actualizar la contraseña: " + err.message);
     } finally {
-      setGuardando(false);
+      setGuardandoPassword(false);
     }
   }
 
   async function handleCerrarSesion() {
     await supabase.auth.signOut();
-    navigate("/soy-profesional");
+    // Redirige a la pantalla de inicio o login y limpia cualquier estado de sesión
+    window.location.href = "/"; 
   }
 
   if (cargando) {
-    return <div className="text-center py-12 text-ink/60">Cargando tu perfil...</div>;
+    return <div className="p-8 text-center text-ink/60">Cargando perfil…</div>;
   }
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-12 space-y-6">
-      <div className="rounded-sm border border-stone bg-white p-8 shadow-sm">
-        <div className="flex justify-between items-center border-b border-stone pb-4">
-          <div>
-            <h1 className="font-display text-2xl font-bold text-ink">Mi Perfil Profesional</h1>
-            <p className="text-xs text-copper font-medium mt-1 uppercase tracking-wider">
-              Estado de cuenta: <span className="font-bold">{estado}</span>
-            </p>
-          </div>
+    <div className="mx-auto max-w-2xl px-4 py-8">
+      {/* CABECERA CON BOTONES DE ACCESO RÁPIDO ARRIBA */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-stone pb-4 gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-bold text-ink">Mi Perfil Profesional</h1>
+          <p className="text-xs uppercase tracking-wider text-copper mt-1">
+            ESTADO DE CUENTA: {perfil.estado.toUpperCase()}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMostrarModalPassword(!mostrarModalPassword)}
+            className="rounded-sm bg-stone/20 border border-stone px-3 py-1.5 text-xs font-medium text-ink hover:bg-stone/30 cursor-pointer transition"
+          >
+            🔑 Cambiar Clave
+          </button>
           <button
             onClick={handleCerrarSesion}
-            className="text-xs text-red-600 hover:underline border border-red-200 px-3 py-1.5 rounded-sm cursor-pointer"
+            className="rounded-sm border border-copper px-3 py-1.5 text-xs font-medium text-copper hover:bg-copper hover:text-white cursor-pointer transition"
           >
             Cerrar Sesión
           </button>
         </div>
-
-        <form onSubmit={handleActualizar} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Nombre y Apellido</label>
-            <input
-              type="text"
-              required
-              value={nombreCompleto}
-              onChange={(e) => setNombreCompleto(e.target.value)}
-              className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">WhatsApp</label>
-            <input
-              type="tel"
-              required
-              value={whatsapp}
-              onChange={(e) => setWhatsapp(e.target.value)}
-              className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Rubro / Oficio</label>
-            <select
-              required
-              value={rubroIdSeleccionado}
-              onChange={(e) => setRubroIdSeleccionado(e.target.value)}
-              className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none bg-white"
-            >
-              <option value="">Selecciona un rubro...</option>
-              {listaRubros.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.nombre || r.titulo || r.descripcion || r.id}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Dirección</label>
-            <input
-              type="text"
-              required
-              value={direccion}
-              onChange={(e) => setDireccion(e.target.value)}
-              className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Localidad</label>
-            <input
-              type="text"
-              required
-              value={localidad}
-              onChange={(e) => setLocalidad(e.target.value)}
-              className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-            />
-          </div>
-
-          {/* Botón y campos de geolocalización */}
-          <div className="rounded-sm bg-stone/20 p-4 border border-stone/50 space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-medium uppercase tracking-wider text-ink/70">Geolocalización en el mapa</span>
-              <button
-                type="button"
-                onClick={handleUbicarDireccion}
-                disabled={geocodificando}
-                className="rounded-sm bg-ink text-paper text-xs px-3 py-1.5 font-medium hover:opacity-90 cursor-pointer disabled:opacity-50"
-              >
-                {geocodificando ? "Buscando..." : "📍 Ubicar en el mapa"}
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] uppercase tracking-wider text-ink/60">Latitud</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={latitud}
-                  placeholder="Automático"
-                  className="mt-1 w-full rounded-sm border border-stone bg-white px-2 py-1 text-xs text-ink/80"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] uppercase tracking-wider text-ink/60">Longitud</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={longitud}
-                  placeholder="Automático"
-                  className="mt-1 w-full rounded-sm border border-stone bg-white px-2 py-1 text-xs text-ink/80"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Descripción de Servicios</label>
-            <textarea
-              rows="3"
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-            ></textarea>
-          </div>
-
-          <button
-            type="submit"
-            disabled={guardando}
-            className="w-full rounded-sm bg-copper py-2.5 font-medium text-paper hover:opacity-90 cursor-pointer"
-          >
-            {guardando ? "Guardando cambios..." : "Guardar Cambios"}
-          </button>
-
-          {mensaje && (
-            <p className={`text-sm text-center mt-2 ${mensaje.includes("éxito") ? "text-green-600" : "text-red-600"}`}>
-              {mensaje}
-            </p>
-          )}
-        </form>
       </div>
 
-      {/* SECCIÓN DE GESTIÓN DE DOCUMENTACIÓN */}
-      <div className="rounded-sm border border-stone bg-white p-8 shadow-sm space-y-4">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-copper">Gestión de Documentación</h2>
-        <p className="text-xs text-ink/65">Visualizá tus documentos actuales, eliminalos si están desactualizados o subí un archivo nuevo para reactivar tu cuenta.</p>
-
-        <div className="space-y-2">
-          {archivosStorage.length > 0 ? (
-            archivosStorage.map((file, idx) => (
-              <div key={idx} className="flex items-center justify-between rounded-sm border border-stone bg-stone/5 p-3">
-                <a
-                  href={file.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-medium text-taller underline truncate max-w-[240px]"
+      {/* DESPLEGABLE / FORMULARIO RÁPIDO PARA CAMBIAR CONTRASEÑA CON OJITOS */}
+      {mostrarModalPassword && (
+        <div className="mt-4 rounded-sm border border-copper/40 bg-copper/5 p-4 shadow-xs">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-copper mb-2">Modificar contraseña de acceso</h3>
+          <form onSubmit={handleCambiarPassword} className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-ink/70 mb-1">Nueva contraseña</label>
+              <div className="relative">
+                <input
+                  type={verNuevaPass ? "text" : "password"}
+                  placeholder="Mínimo 6 caracteres"
+                  value={nuevaPassword}
+                  onChange={(e) => setNuevaPassword(e.target.value)}
+                  className="w-full rounded-sm border border-stone bg-white px-3 py-1.5 pr-10 text-xs text-ink focus:border-copper focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setVerNuevaPass(!verNuevaPass)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-ink/60 hover:text-ink cursor-pointer px-1"
                 >
+                  {verNuevaPass ? "🙈 Ocultar" : "👁️ Ver"}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-ink/70 mb-1">Confirmar nueva contraseña</label>
+              <div className="relative">
+                <input
+                  type={verConfirmarPass ? "text" : "password"}
+                  placeholder="Repetir contraseña"
+                  value={confirmarPassword}
+                  onChange={(e) => setConfirmarPassword(e.target.value)}
+                  className="w-full rounded-sm border border-stone bg-white px-3 py-1.5 pr-10 text-xs text-ink focus:border-copper focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setVerConfirmarPass(!verConfirmarPass)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-ink/60 hover:text-ink cursor-pointer px-1"
+                >
+                  {verConfirmarPass ? "🙈 Ocultar" : "👁️ Ver"}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setMostrarModalPassword(false)}
+                className="rounded-sm px-3 py-1 text-xs text-ink/60 hover:text-ink cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={guardandoPassword}
+                className="rounded-sm bg-copper px-3 py-1 text-xs font-medium text-white hover:opacity-90 cursor-pointer"
+              >
+                {guardandoPassword ? "Guardando..." : "Guardar clave"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* FORMULARIO DE DATOS PRINCIPALES */}
+      <form onSubmit={handleGuardarCambios} className="mt-6 space-y-4">
+        <div>
+          <label className="block text-xs font-medium uppercase tracking-wider text-ink/60 mb-1">Nombre y Apellido</label>
+          <input
+            type="text"
+            value={perfil.nombre_completo}
+            onChange={(e) => setPerfil({ ...perfil, nombre_completo: e.target.value })}
+            className="w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none text-sm"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium uppercase tracking-wider text-ink/60 mb-1">WhatsApp / Teléfono</label>
+          <input
+            type="text"
+            value={perfil.whatsapp}
+            onChange={(e) => setPerfil({ ...perfil, whatsapp: e.target.value })}
+            className="w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium uppercase tracking-wider text-ink/60 mb-1">Rubro / Oficio</label>
+          <select
+            value={rubroSeleccionado}
+            onChange={(e) => setRubroSeleccionado(e.target.value)}
+            className="w-full rounded-sm border border-stone bg-white px-3 py-2 text-ink focus:border-copper focus:outline-none text-sm"
+          >
+            <option value="" disabled>Seleccioná tu rubro</option>
+            {rubros.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.nombre.charAt(0).toUpperCase() + r.nombre.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium uppercase tracking-wider text-ink/60 mb-1">Dirección</label>
+          <input
+            type="text"
+            value={perfil.direccion}
+            onChange={(e) => setPerfil({ ...perfil, direccion: e.target.value })}
+            className="w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium uppercase tracking-wider text-ink/60 mb-1">Localidad</label>
+          <input
+            type="text"
+            value={perfil.localidad}
+            onChange={(e) => setPerfil({ ...perfil, localidad: e.target.value })}
+            className="w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none text-sm"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 rounded-sm border border-stone/40 p-4 bg-stone/5">
+          <div className="col-span-2">
+            <span className="block text-xs font-bold uppercase tracking-wider text-ink/70">Geolocalización en el mapa</span>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-ink/60 mb-1">Latitud</label>
+            <input
+              type="text"
+              value={perfil.latitud}
+              onChange={(e) => setPerfil({ ...perfil, latitud: e.target.value })}
+              className="w-full rounded-sm border border-stone bg-white px-3 py-1.5 text-xs text-ink focus:border-copper focus:outline-none font-mono"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-ink/60 mb-1">Longitud</label>
+            <input
+              type="text"
+              value={perfil.longitud}
+              onChange={(e) => setPerfil({ ...perfil, longitud: e.target.value })}
+              className="w-full rounded-sm border border-stone bg-white px-3 py-1.5 text-xs text-ink focus:border-copper focus:outline-none font-mono"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium uppercase tracking-wider text-ink/60 mb-1">Descripción de Servicios</label>
+          <textarea
+            rows={4}
+            value={perfil.descripcion}
+            onChange={(e) => setPerfil({ ...perfil, descripcion: e.target.value })}
+            className="w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none text-sm"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={guardando}
+          className="w-full rounded-sm bg-copper py-2.5 font-medium text-white hover:opacity-90 cursor-pointer shadow-xs transition"
+        >
+          {guardando ? "Guardando cambios..." : "Guardar Cambios"}
+        </button>
+      </form>
+
+      {/* GESTIÓN DE DOCUMENTACIÓN */}
+      <div className="mt-8 rounded-sm border border-stone/40 bg-white p-6 shadow-xs">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-copper">Gestión de Documentación</h3>
+        <p className="text-xs text-ink/60 mt-1">Visualizá tus documentos actuales, eliminalos si están desactualizados o subí un archivo nuevo para reactivar tu cuenta.</p>
+
+        <div className="mt-4 space-y-2">
+          {archivosStorage.length === 0 ? (
+            <p className="text-xs text-ink/40 italic">No hay archivos vinculados.</p>
+          ) : (
+            archivosStorage.map((file, idx) => (
+              <div key={idx} className="flex items-center justify-between rounded-sm border border-stone/30 p-2 bg-stone/5">
+                <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-ink hover:underline truncate max-w-[70%]">
                   📄 {file.nombre}
                 </a>
                 <button
@@ -440,24 +441,22 @@ export default function MiPerfil() {
                 </button>
               </div>
             ))
-          ) : (
-            <p className="text-xs text-ink/40 italic">No hay documentos cargados en el storage.</p>
           )}
         </div>
 
-        <form onSubmit={handleSubirNuevoArchivo} className="mt-4 border-t border-stone pt-4 space-y-3">
-          <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">
-            Subir nuevo documento de actualización
-          </label>
-          <input
-            type="file"
-            onChange={(e) => setNuevoArchivo(e.target.files[0])}
-            className="w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:text-xs file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
-          />
+        <form onSubmit={handleSubirDocumento} className="mt-6 border-t border-stone/20 pt-4">
+          <label className="block text-xs font-bold uppercase tracking-wider text-ink/70 mb-2">Subir nuevo documento de actualización</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="file"
+              onChange={(e) => setNuevoArchivo(e.target.files[0])}
+              className="text-xs text-ink file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:text-xs file:font-semibold file:bg-stone/20 file:text-ink hover:file:bg-stone/30 cursor-pointer"
+            />
+          </div>
           <button
             type="submit"
-            disabled={!nuevoArchivo || subiendoArchivo}
-            className="w-full rounded-sm bg-taller py-2 text-xs font-medium text-paper hover:opacity-90 disabled:opacity-50 cursor-pointer"
+            disabled={subiendoArchivo || !nuevoArchivo}
+            className="mt-3 w-full rounded-sm bg-taller py-2 text-xs font-medium text-paper hover:opacity-90 cursor-pointer shadow-xs transition disabled:opacity-50"
           >
             {subiendoArchivo ? "Subiendo..." : "Subir archivo y enviar a revisión"}
           </button>

@@ -3,7 +3,6 @@ import { supabase } from "../api/supabaseClient.js";
 
 // =========================================================================
 // CONFIGURACIÓN DE CONTACTO DE WHATSAPP (MODIFICÁ ESTE NÚMERO CUANDO QUIERAS)
-// Formato internacional sin espacios, guiones ni símbolos (Ej: código de país + área + número)
 // =========================================================================
 const NUMERO_WHATSAPP_ADMIN = "5492216110999"; 
 
@@ -140,7 +139,6 @@ export default function AdminLogin() {
     }));
   }
 
-  // Función para guardar específicamente el cambio de rubro de manera independiente
   async function actualizarRubroSeleccionado() {
     if (!seleccionada) return;
     const nuevoRubroId = rubrosSeleccionados[seleccionada.id];
@@ -241,6 +239,44 @@ export default function AdminLogin() {
     }
   }
 
+  // CAMBIO DE CONTRASEÑA DIRECTO DESDE EL PANEL
+  async function handleCambiarPasswordDirecto(userId, emailProfesional) {
+    if (!userId) {
+      alert("No se encontró el ID del usuario.");
+      return;
+    }
+
+    const nuevaPassword = window.prompt(`Escribe la nueva contraseña para ${emailProfesional || 'el usuario'} (mínimo 6 caracteres):`);
+    if (nuevaPassword === null) return; // Si cancela
+
+    if (nuevaPassword.length < 6) {
+      alert("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    try {
+      setCargando(true);
+      
+      // Intentamos actualizar directamente usando la función admin de supabase mediante RPC o llamada directa
+      const { error } = await supabase.rpc('actualizar_password_usuario', {
+        user_id: userId,
+        nueva_pass: nuevaPassword
+      });
+
+      if (error) {
+        // Si la función RPC no existe aún en la base de datos, mostramos una alternativa clara
+        console.warn(error);
+        alert("Para cambiar la contraseña de forma directa, asegúrate de tener creada la función RPC en Supabase o usa el cambio manual. (Detalle: " + error.message + ")");
+      } else {
+        alert(`¡Contraseña actualizada con éxito para ${emailProfesional}! Ya puede ingresar con su nueva clave.`);
+      }
+    } catch (err) {
+      alert("Ocurrió un error al actualizar la contraseña: " + err.message);
+    } finally {
+      setCargando(false);
+    }
+  }
+
   function handleLogin(e) {
     if (e) e.preventDefault();
     if (password === "1478") {
@@ -306,7 +342,6 @@ export default function AdminLogin() {
       <div className="flex items-center justify-between border-b border-stone pb-4">
         <h1 className="font-display text-2xl font-bold text-ink">Panel de moderación</h1>
         <div className="flex items-center gap-4">
-          {/* Enlace rápido de contacto usando la constante definida arriba */}
           <a
             href={`https://wa.me/${NUMERO_WHATSAPP_ADMIN}?text=Hola,%20contacto%20desde%20el%20panel%20de%20administración.`}
             target="_blank"
@@ -398,7 +433,6 @@ export default function AdminLogin() {
                   ))}
                 </select>
 
-                {/* Botón independiente para actualizar el rubro de inmediato */}
                 <button
                   type="button"
                   onClick={actualizarRubroSeleccionado}
@@ -453,6 +487,15 @@ export default function AdminLogin() {
                     </button>
                   </>
                 )}
+
+                {/* BOTÓN PARA ASIGNAR NUEVA CLAVE DIRECTAMENTE */}
+                <button
+                  type="button"
+                  onClick={() => handleCambiarPasswordDirecto(seleccionada.user_id || seleccionada.id, seleccionada.email)}
+                  className="rounded-sm bg-stone/20 px-3 py-2 text-xs font-medium text-ink hover:bg-stone/30 border border-stone cursor-pointer shadow-xs flex items-center gap-1"
+                >
+                  🔑 Asignar Nueva Clave
+                </button>
               </div>
 
               <p className="mt-5 text-sm text-ink/80">{seleccionada.descripcion || "Sin descripción proporcionada."}</p>
