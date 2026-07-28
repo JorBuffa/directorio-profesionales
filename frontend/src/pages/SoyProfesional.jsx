@@ -35,6 +35,9 @@ export default function SoyProfesional() {
   const [certificadoMatricula, setCertificadoMatricula] = useState(null);
   const [certificadoBuenaConducta, setCertificadoBuenaConducta] = useState(null);
 
+  // Estado para el Acuerdo de Mantenimiento y Aporte Mensual
+  const [aceptoContrato, setAceptoContrato] = useState(false);
+
   // Estados para mostrar/ocultar contraseñas
   const [mostrarPasswordLogin, setMostrarPasswordLogin] = useState(false);
   const [mostrarPasswordRegistro, setMostrarPasswordRegistro] = useState(false);
@@ -189,6 +192,11 @@ export default function SoyProfesional() {
       return;
     }
 
+    if (!aceptoContrato) {
+      alert("Debes aceptar el compromiso de mantenimiento y aporte mensual para continuar.");
+      return;
+    }
+
     const nombreFormateado = capitalizarNombre(nombreCompleto);
     
     const textoCredenciales = encodeURIComponent(`¡Hola ${nombreFormateado}!\n\nEstás a un paso de registrarte en ConectaOficios. Tus credenciales para cuando finalices serán:\n\n📧 Usuario / Email: ${emailRegistro}\n🔑 Contraseña: ${passwordRegistro}\n\nPor favor, volvé a la pantalla de la app y confirmá si te llegó este mensaje.`);
@@ -225,7 +233,6 @@ export default function SoyProfesional() {
         if (!file || !userId) return null;
         const fileExt = file.name.split('.').pop();
         
-        // Guardamos el archivo dentro de una carpeta con el ID del usuario
         const fileName = `${userId}/${userId}-${nombrePrefijo}-${Math.random()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
@@ -270,7 +277,6 @@ export default function SoyProfesional() {
         return;
       }
 
-      // Procesar Rubros Seleccionados y Opcionales
       let listaRubrosIdsFinales = [...rubrosSeleccionados];
 
       if (nuevoRubro.trim() !== "") {
@@ -286,7 +292,6 @@ export default function SoyProfesional() {
         }
       }
 
-      // Insertar relaciones múltiples en profesional_rubros
       if (listaRubrosIdsFinales.length > 0 && userId) {
         const relacionesARecordar = listaRubrosIdsFinales.map(rId => ({
           profesional_id: userId,
@@ -588,7 +593,7 @@ export default function SoyProfesional() {
               </div>
 
               {/* 3. Documentación Requerida */}
-              <div className="space-y-4">
+              <div className="space-y-4 border-b border-stone pb-4">
                 <h2 className="text-xs font-bold uppercase tracking-wider text-copper">3. Documentación Requerida (Imágenes o PDF)</h2>
 
                 <div>
@@ -631,10 +636,40 @@ export default function SoyProfesional() {
                 </div>
               </div>
 
+              {/* 4. ACUERDO DE MANTENIMIENTO Y APORTE MENSUAL */}
+              <div className="p-4 bg-stone/10 border border-stone/30 rounded-sm space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-copper">
+                  4. Acuerdo de Vinculación y Mantenimiento
+                </h3>
+                <p className="text-xs text-ink/70 leading-relaxed">
+                  Para mantener tu perfil activo, visibilidad y soporte en la plataforma, se requiere un aporte mensual de mantenimiento cuyo monto se coordina vía WhatsApp. Puedes consultar los detalles completos en el{" "}
+                  <a 
+                    href="/Contrato_Mantenimiento_Profesional_ConectaOficios.pdf" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-copper font-bold underline hover:text-ink cursor-pointer"
+                  >
+                    Contrato en PDF
+                  </a>.
+                </p>
+
+                <label className="flex items-start gap-2.5 cursor-pointer pt-1">
+                  <input
+                    type="checkbox"
+                    checked={aceptoContrato}
+                    onChange={(e) => setAceptoContrato(e.target.checked)}
+                    className="mt-0.5 rounded border-stone text-copper focus:ring-copper cursor-pointer"
+                  />
+                  <span className="text-xs font-medium text-ink">
+                    He leído, comprendido y acepto los términos del acuerdo de mantenimiento y aporte mensual de ConectaOficios.
+                  </span>
+                </label>
+              </div>
+
               <button
                 type="submit"
-                disabled={cargando}
-                className="w-full rounded-sm bg-copper py-2.5 font-medium text-paper hover:opacity-90 cursor-pointer mt-4"
+                disabled={cargando || !aceptoContrato}
+                className="w-full rounded-sm bg-copper py-2.5 font-medium text-paper hover:opacity-90 cursor-pointer mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {cargando ? "Procesando..." : "Guardar y Verificar WhatsApp"}
               </button>
