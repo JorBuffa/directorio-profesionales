@@ -10,6 +10,7 @@ import MiPerfil from "./pages/MiPerfil.jsx";
 import EditarPerfil from "./pages/EditarPerfil.jsx";
 import AdminLogin from "./pages/AdminLogin.jsx";
 import Admin from "./pages/Admin.jsx";
+import Terminos from "./pages/Terminos.jsx";
 import NotFound from "./pages/NotFound.jsx";
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/mi-perfil" element={<MiPerfil />} />
           <Route path="/editar-perfil" element={<EditarPerfil />} />
           <Route path="/admin-login" element={<AdminLogin />} />
+          <Route path="/terminos" element={<Terminos />} />
           <Route
             path="/admin"
             element={

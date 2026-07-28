@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../api/supabaseClient.js";
 import MapView from "../components/MapView.jsx";
 
@@ -103,7 +104,6 @@ export default function Buscar() {
   const profesionalesFiltrados = profesionales
     .filter(p => p.profesional_rubros?.some(pr => pr.rubros?.id === rubroSeleccionado))
     .map((p, index) => {
-      // Si la base de datos tiene lat/lng las usa; si no, genera una coordenada precisa en Unquillo para que aparezca el pin
       const latProf = p.lat || p.latitud || (-31.2333 + (index * 0.002));
       const lngProf = p.lng || p.longitud || p.lon || (-64.3167 - (index * 0.002));
       
@@ -123,42 +123,58 @@ export default function Buscar() {
       
       {/* PASO 1 */}
       {paso === "datos" && (
-        <div className="mx-auto max-w-md rounded-sm border border-stone bg-white p-8 shadow-sm">
-          <h1 className="font-display text-2xl font-bold text-ink">Buscar profesional</h1>
-          <p className="mt-1 text-sm text-ink/60">Ingresá tus datos para comenzar la búsqueda.</p>
+        <div className="flex flex-col items-center">
+          <div className="w-full max-w-md rounded-sm border border-stone bg-white p-8 shadow-sm">
+            <h1 className="font-display text-2xl font-bold text-ink">Buscar profesional</h1>
+            <p className="mt-1 text-sm text-ink/60">Ingresá tus datos para comenzar la búsqueda.</p>
 
-          <form onSubmit={handleIniciarBusqueda} className="mt-6 space-y-4">
-            <div>
-              <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Tu Nombre</label>
-              <input
-                type="text"
-                required
-                value={nombreCliente}
-                onChange={(e) => setNombreCliente(e.target.value)}
-                placeholder="Ej. Juan Pérez"
-                className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-              />
-            </div>
+            <form onSubmit={handleIniciarBusqueda} className="mt-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Tu Nombre</label>
+                <input
+                  type="text"
+                  required
+                  value={nombreCliente}
+                  onChange={(e) => setNombreCliente(e.target.value)}
+                  placeholder="Ej. Juan Pérez"
+                  className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
+                />
+              </div>
 
-            <div>
-              <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Número de Teléfono</label>
-              <input
-                type="tel"
-                required
-                value={telefonoCliente}
-                onChange={(e) => setTelefonoCliente(e.target.value)}
-                placeholder="Ej. 3511234567"
-                className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
-              />
-            </div>
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Número de Teléfono</label>
+                <input
+                  type="tel"
+                  required
+                  value={telefonoCliente}
+                  onChange={(e) => setTelefonoCliente(e.target.value)}
+                  placeholder="Ej. 3511234567"
+                  className="mt-1 w-full rounded-sm border border-stone px-3 py-2 text-ink focus:border-copper focus:outline-none"
+                />
+              </div>
 
-            <button
-              type="submit"
-              className="w-full rounded-sm bg-taller py-2.5 font-medium text-paper hover:opacity-90 cursor-pointer"
-            >
-              Continuar
-            </button>
-          </form>
+              <button
+                type="submit"
+                className="w-full rounded-sm bg-taller py-2.5 font-medium text-paper hover:opacity-90 cursor-pointer"
+              >
+                Continuar
+              </button>
+            </form>
+          </div>
+
+          {/* Recuadro visible de Términos y Condiciones debajo del formulario */}
+          <div className="w-full max-w-md mt-4 rounded-sm border border-stone/60 bg-stone/10 p-3 text-center">
+            <p className="text-[11px] text-ink/70 leading-snug">
+              Al continuar, aceptás nuestros{" "}
+              <a 
+                href="/terminos" 
+                className="font-bold text-copper underline hover:text-ink cursor-pointer"
+              >
+                Términos y Condiciones
+              </a>
+              . ConectaOficios es una plataforma de intermediación tecnológica; no participamos ni nos responsabilizamos por los acuerdos o servicios prestados entre usuarios y profesionales.
+            </p>
+          </div>
         </div>
       )}
 
@@ -183,7 +199,6 @@ export default function Buscar() {
                 onClick={() => handleSeleccionarRubro(r.id)}
                 className="flex flex-col items-center justify-center rounded-sm border border-stone bg-white p-6 shadow-sm transition hover:border-copper hover:bg-copper/5 cursor-pointer"
               >
-                {/* Se aplica la función capitalizarTexto aquí */}
                 <span className="font-display font-semibold text-ink text-center">
                   {capitalizarTexto(r.nombre)}
                 </span>
