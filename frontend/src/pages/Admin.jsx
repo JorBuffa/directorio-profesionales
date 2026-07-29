@@ -17,6 +17,7 @@ export default function Admin() {
   async function cargar() {
     setCargando(true);
     try {
+      // Primero intentamos la consulta trayendo todos los registros del estado actual
       const { data, error } = await supabase
         .from('profesionales')
         .select(`
@@ -30,23 +31,29 @@ export default function Admin() {
         .eq('estado', tab);
 
       if (error) {
+        console.warn("Error en consulta con relaciones, intentando fallback simple...", error);
         const { data: dataFallback, error: errFallback } = await supabase
           .from('profesionales')
-          .select(`*`);
+          .select('*')
+          .eq('estado', tab);
         
         if (!errFallback && dataFallback) {
-          const filtrados = dataFallback.filter(item => item.estado === tab);
-          setSolicitudes(filtrados.length > 0 ? filtrados : dataFallback);
-          if (dataFallback.length > 0) setSeleccionada(dataFallback[0]);
-          else setSeleccionada(null);
+          setSolicitudes(dataFallback);
+          setSeleccionada(dataFallback.length > 0 ? dataFallback[0] : null);
+        } else {
+          setSolicitudes([]);
+          setSeleccionada(null);
         }
-      } else if (data) {
-        setSolicitudes(data);
-        if (data.length > 0) setSeleccionada(data[0]);
-        else setSeleccionada(null);
+      } else {
+        // Aseguramos filtrar también en el cliente por si acaso la base devuelve algo extra
+        const filtrados = (data || []).filter(item => item.estado === tab);
+        setSolicitudes(filtrados);
+        setSeleccionada(filtrados.length > 0 ? filtrados[0] : null);
       }
     } catch (err) {
       console.error("Error al cargar profesionales:", err);
+      setSolicitudes([]);
+      setSeleccionada(null);
     } finally {
       setCargando(false);
     }

@@ -28,7 +28,7 @@ export default function MiPerfil() {
     { id: "dni_frente", label: "DNI (Frente)" },
     { id: "dni_dorso", label: "DNI (Dorso)" },
     { id: "matricula", label: "Matrícula / Certificado" },
-    { id: "adicional", label: "Documento Adicional / CV" }
+    { id: "adicional", label: "Certif. Buena Conducta" }
   ];
 
   const [documentosProfesional, setDocumentosProfesional] = useState({});
@@ -52,7 +52,7 @@ export default function MiPerfil() {
     try {
       const { data, error } = await supabase.from('rubros').select('*').order('nombre');
       if (!error && data) setRubros(data);
-    } catch (err) {
+    } catch (err)  {
       console.error("Error al cargar rubros:", err);
     }
   }
@@ -89,7 +89,11 @@ export default function MiPerfil() {
           )
         `)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error al consultar perfil del profesional:", error);
+      }
 
       if (data) {
         const perfilObj = {
@@ -111,7 +115,9 @@ export default function MiPerfil() {
           setRubrosSeleccionados(idsAsociados);
         }
 
-        await listarArchivosStorage(data.id, data.email);
+        await listarArchivosStorage(data.id);
+      } else {
+        console.warn("No se encontró ningún registro de profesional asociado al auth.uid actual.");
       }
     } catch (err) {
       console.error("Error al cargar perfil:", err);
@@ -120,25 +126,41 @@ export default function MiPerfil() {
     }
   }
 
-  async function listarArchivosStorage(profesionalId, email) {
+  async function listarArchivosStorage(profesionalId) {
     try {
-      const { data, error } = await supabase.storage.from('documentos').list('', { limit: 100 });
+      const { data, error } = await supabase.storage.from('documentos').list(profesionalId, { limit: 100 });
+      
       if (!error && data) {
-        const matches = data.filter(file => 
-          file.name.includes(profesionalId) || 
-          (email && file.name.toLowerCase().includes(email.toLowerCase().split('@')[0]))
-        );
-
         const docsMapeados = {};
 
-        TIPOS_DOCUMENTOS_OBLIGATORIOS.forEach(tipo => {
-          // Buscamos archivos que contengan exactamente el ID del tipo (ej: dni_dorso)
-          const archivoEncontrado = matches.find(file => file.name.includes(`-${tipo.id}-`) || file.name.includes(tipo.id));
+        TIPOS_DOCUMENTOS_OBLIGATORIOS.forEach((tipo) => {
+          let archivoEncontrado = data.find(f => {
+            const nombreLower = f.name.toLowerCase();
+            if (tipo.id === "dni_frente") {
+              return nombreLower.startsWith("dni_frente") || (nombreLower.includes("frente") && !nombreLower.includes("dorso"));
+            } else if (tipo.id === "dni_dorso") {
+              return nombreLower.startsWith("dni_dorso") || nombreLower.includes("dorso");
+            } else if (tipo.id === "matricula") {
+              return nombreLower.startsWith("matricula") || nombreLower.includes("matricula") || nombreLower.includes("certificado") || nombreLower.includes("titulo");
+            } else if (tipo.id === "adicional") {
+              return (
+                nombreLower.startsWith("adicional") || 
+                nombreLower.includes("adicional") || 
+                nombreLower.includes("cv") || 
+                nombreLower.includes("otro") || 
+                nombreLower.includes("conducta") || 
+                nombreLower.includes("certificado")
+              );
+            }
+            return false;
+          });
 
           if (archivoEncontrado) {
-            const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(archivoEncontrado.name);
+            const rutaCompleta = `${profesionalId}/${archivoEncontrado.name}`;
+            const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(rutaCompleta);
+            
             docsMapeados[tipo.id] = {
-              nombreArchivo: archivoEncontrado.name,
+              nombreArchivo: rutaCompleta,
               url: urlData.publicUrl
             };
           } else {
@@ -149,7 +171,7 @@ export default function MiPerfil() {
         setDocumentosProfesional(docsMapeados);
       }
     } catch (err) {
-      console.error("Error al listar archivos:", err);
+      console.error("Error al listar archivos del Storage:", err);
     }
   }
 
@@ -193,7 +215,6 @@ export default function MiPerfil() {
     }
   }
 
-  // Subir documento individual reemplazando el anterior si ya existía uno viejo
   async function handleSubirIndividual(tipoId) {
     const archivo = archivosSeleccionados[tipoId];
     if (!archivo) {
@@ -204,33 +225,24 @@ export default function MiPerfil() {
     try {
       setSubiendoTipo(tipoId);
 
-      // 1. Si ya había un archivo previo de este tipo en el storage, lo borramos primero para que no quede obsoleto
       const documentoAnterior = documentosProfesional[tipoId];
       if (documentoAnterior && documentoAnterior.nombreArchivo) {
         await supabase.storage.from('documentos').remove([documentoAnterior.nombreArchivo]);
       }
 
-      // 2. Subimos el nuevo archivo con nomenclatura limpia y estricta
       const fileExt = archivo.name.split('.').pop();
-      const nombreArchivo = `${perfil.id}-${tipoId}-${Date.now()}.${fileExt}`;
+      const rutaArchivo = `${perfil.id}/${tipoId}-${Date.now()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from('documentos')
-        .upload(nombreArchivo, archivo);
+        .upload(rutaArchivo, archivo);
 
       if (uploadError) throw uploadError;
 
-      // 3. Actualizamos el estado del profesional a pendiente
-      await supabase
-        .from('profesionales')
-        .update({ estado: 'pendiente' })
-        .eq('id', perfil.id);
-
       setArchivosSeleccionados(prev => ({ ...prev, [tipoId]: null }));
-      setPerfil(prev => ({ ...prev, estado: 'pendiente' }));
 
       alert("¡Documento subido y actualizado con éxito!");
-      await listarArchivosStorage(perfil.id, perfil.email);
+      await listarArchivosStorage(perfil.id);
     } catch (err) {
       alert("Error al subir el archivo: " + err.message);
     } finally {
@@ -238,10 +250,23 @@ export default function MiPerfil() {
     }
   }
 
-  function handleNotificarAdmin() {
-    const nombreProf = perfil.nombre_completo || "Profesional";
-    const mensajeAdmin = `⚠️ *AVISO DE REVISIÓN DE DOCUMENTACIÓN*:\nEl profesional *${nombreProf}* ha actualizado/subido su documentación y solicita revisión en el panel.`;
-    window.open(`https://wa.me/${NUMERO_WHATSAPP_ADMIN}?text=${encodeURIComponent(mensajeAdmin)}`, '_blank');
+  async function handleNotificarAdmin() {
+    try {
+      const { error } = await supabase
+        .from('profesionales')
+        .update({ estado: 'pendiente' })
+        .eq('id', perfil.id);
+
+      if (error) throw error;
+
+      setPerfil(prev => ({ ...prev, estado: 'pendiente' }));
+
+      const nombreProf = perfil.nombre_completo || "Profesional";
+      const mensajeAdmin = `⚠️ *AVISO DE REVISIÓN DE DOCUMENTACIÓN*:\nEl profesional *${nombreProf}* ha actualizado/subido su documentación y solicita revisión en el panel.`;
+      window.open(`https://wa.me/${NUMERO_WHATSAPP_ADMIN}?text=${encodeURIComponent(mensajeAdmin)}`, '_blank');
+    } catch (err) {
+      alert("Error al cambiar el estado a pendiente: " + err.message);
+    }
   }
 
   async function handleEliminarArchivo(tipoId) {
@@ -259,7 +284,7 @@ export default function MiPerfil() {
       }));
 
       alert("Archivo eliminado correctamente.");
-      await listarArchivosStorage(perfil.id, perfil.email);
+      await listarArchivosStorage(perfil.id);
     } catch (err) {
       alert("Error al eliminar: " + err.message);
     }
@@ -553,7 +578,7 @@ export default function MiPerfil() {
                   </div>
                 </div>
 
-                {/* Selector individual para rellenar o actualizar el casillero */}
+                {/* Selector individual para rellenar, actualizar o reemplazar el casillero */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-stone/20">
                   <input
                     type="file"
@@ -569,7 +594,7 @@ export default function MiPerfil() {
                     onClick={() => handleSubirIndividual(tipo.id)}
                     className="rounded-sm bg-taller px-4 py-1.5 text-xs font-medium text-paper hover:opacity-90 cursor-pointer transition disabled:opacity-40 shrink-0"
                   >
-                    {estaSubiendoEste ? "Actualizando..." : (doc ? "Actualizar este archivo" : "Subir este archivo")}
+                    {estaSubiendoEste ? "Actualizando..." : (doc ? "Reemplazar archivo" : "Subir este archivo")}
                   </button>
                 </div>
               </div>

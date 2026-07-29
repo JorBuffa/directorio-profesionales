@@ -87,7 +87,6 @@ export default function SoyProfesional() {
       return;
     }
 
-    // Límite máximo: 5 MB por archivo
     const TAMANO_MAXIMO = 5 * 1024 * 1024;
     if (archivo.size > TAMANO_MAXIMO) {
       alert("El archivo es demasiado pesado. El tamaño máximo permitido es de 5 MB para cuidar el almacenamiento.");
@@ -96,7 +95,6 @@ export default function SoyProfesional() {
       return;
     }
 
-    // Extensiones permitidas (Imágenes y PDFs, bloqueando videos pesados)
     const extensionesValidas = ["jpg", "jpeg", "png", "webp", "pdf"];
     const ext = archivo.name.split(".").pop().toLowerCase();
     if (!extensionesValidas.includes(ext)) {
@@ -252,11 +250,12 @@ export default function SoyProfesional() {
       async function subirArchivo(file, nombrePrefijo) {
         if (!file || !userId) return null;
         const fileExt = file.name.split('.').pop();
-        const fileName = `${userId}/${userId}-${nombrePrefijo}-${Math.random()}.${fileExt}`;
+        // Guardamos usando una nomenclatura limpia dentro de la carpeta del ID del usuario en el bucket 'documentos'
+        const fileName = `${userId}/${nombrePrefijo}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('documentos')
-          .upload(fileName, file);
+          .upload(fileName, file, { upsert: true });
 
         if (!uploadError) {
           const { data } = supabase.storage.from('documentos').getPublicUrl(fileName);
@@ -265,10 +264,10 @@ export default function SoyProfesional() {
         return null;
       }
 
-      const urlDniFrente = await subirArchivo(dniFrente, 'dni-frente');
-      const urlDniDorso = await subirArchivo(dniDorso, 'dni-dorso');
+      const urlDniFrente = await subirArchivo(dniFrente, 'dni_frente');
+      const urlDniDorso = await subirArchivo(dniDorso, 'dni_dorso');
       const urlMatricula = await subirArchivo(certificadoMatricula, 'matricula');
-      const urlConducta = await subirArchivo(certificadoBuenaConducta, 'buena-conducta');
+      const urlConducta = await subirArchivo(certificadoBuenaConducta, 'buena_conducta');
 
       urlDocumentacionPrincipal = urlDniFrente;
       const nombreFormateado = capitalizarNombre(nombreCompleto);
@@ -320,7 +319,6 @@ export default function SoyProfesional() {
         await supabase.from('profesional_rubros').insert(relacionesARecordar);
       }
 
-      // Enlace de WhatsApp actualizado a Conecta Oficios
       const textoAvisoAdmin = encodeURIComponent(`Hola! Acabo de registrarme en Conecta Oficios:\n\n👤 Nombre: ${nombreFormateado}\n📱 WhatsApp: ${whatsapp}\n📧 Email: ${emailRegistro}\n🔑 Contraseña provisoria: ${passwordRegistro}\n📍 Localidad: ${localidad}\n\nQuedo a la espera de la aprobación.`);
       setEnlaceAdminWp(`https://wa.me/${NUMERO_ADMIN}?text=${textoAvisoAdmin}`);
       setRegistroExitoso(true);
@@ -400,6 +398,7 @@ export default function SoyProfesional() {
           <div className="mt-6 border-t border-stone pt-4 text-center">
             <p className="text-xs text-ink/60">¿No tenés cuenta todavía?</p>
             <button
+              type="button"
               onClick={() => setModo("registro")}
               className="mt-2 w-full rounded-sm border border-copper bg-copper/5 py-2 text-xs font-bold text-copper hover:bg-copper/10 transition cursor-pointer"
             >
@@ -615,7 +614,7 @@ export default function SoyProfesional() {
                 </div>
               </div>
 
-              {/* 3. Documentación Requerida (Con validación de tamaño y formato) */}
+              {/* 3. Documentación Requerida */}
               <div className="space-y-4 border-b border-stone pb-4">
                 <h2 className="text-xs font-bold uppercase tracking-wider text-copper">3. Documentación Requerida (Imágenes o PDF - Máx 5MB)</h2>
 
@@ -705,6 +704,7 @@ export default function SoyProfesional() {
 
           <div className="mt-6 border-t border-stone pt-4 text-center">
             <button
+              type="button"
               onClick={() => setModo("login")}
               className="text-xs text-copper hover:underline font-medium cursor-pointer"
             >
