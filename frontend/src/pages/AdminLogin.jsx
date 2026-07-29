@@ -73,44 +73,64 @@ export default function AdminLogin() {
       }
 
       try {
+        // Listamos recursivamente o dentro de la carpeta cuyo nombre contenga el ID del profesional
+        const carpetaId = seleccionada.id;
         const { data, error } = await supabase.storage
           .from('documentos')
-          .list('', { limit: 100 });
+          .list(carpetaId, { limit: 100 });
 
-        if (!error && data) {
-          const matches = data.filter(file => 
-            file.name.includes(seleccionada.id) || 
-            (seleccionada.email && file.name.toLowerCase().includes(seleccionada.email.toLowerCase().split('@')[0]))
-          );
-
-          const archivosConUrl = matches.map((file) => {
-            const { data: urlData } = supabase.storage
-              .from('documentos')
-              .getPublicUrl(file.name);
-            
-            // Detectar la extensión para saber qué icono o comportamiento mostrar
-            const extension = file.name.split('.').pop().toLowerCase();
-            let tipoIcono = "📁";
-            if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(extension)) {
-              tipoIcono = "🖼️";
-            } else if (['pdf'].includes(extension)) {
-              tipoIcono = "📄";
-            } else if (['doc', 'docx', 'txt'].includes(extension)) {
-              tipoIcono = "📝";
-            }
-
-            return {
-              nombre: file.name,
-              url: urlData.publicUrl,
-              extension,
-              tipoIcono
-            };
-          });
-
-          setArchivosStorage(archivosConUrl);
+        let matches = [];
+        if (!error && data && data.length > 0) {
+          // Archivos dentro de la carpeta con el ID del profesional
+          matches = data.map(file => ({
+            name: `${carpetaId}/${file.name}`,
+            nombreOriginal: file.name
+          }));
         } else {
-          setArchivosStorage([]);
+          // Búsqueda general por si están guardados a nivel raíz con el ID en el nombre
+          const { data: rootData, error: rootError } = await supabase.storage
+            .from('documentos')
+            .list('', { limit: 100 });
+
+          if (!rootError && rootData) {
+            const filtrados = rootData.filter(file => 
+              file.name.includes(seleccionada.id) || 
+              (seleccionada.email && file.name.toLowerCase().includes(seleccionada.email.toLowerCase().split('@')[0]))
+            );
+            matches = filtrados.map(file => ({
+              name: file.name,
+              nombreOriginal: file.name.split('/').pop()
+            }));
+          }
         }
+
+        const archivosConUrl = matches.map((file) => {
+          const rutaLimpia = file.name.startsWith('/') ? file.name.substring(1) : file.name;
+          
+          const { data: urlData } = supabase.storage
+            .from('documentos')
+            .getPublicUrl(rutaLimpia);
+          
+          const extension = file.nombreOriginal.split('.').pop().toLowerCase();
+          let tipoIcono = "📁";
+          if (['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(extension)) {
+            tipoIcono = "🖼️";
+          } else if (['pdf'].includes(extension)) {
+            tipoIcono = "📄";
+          } else if (['doc', 'docx', 'txt'].includes(extension)) {
+            tipoIcono = "📝";
+          }
+
+          return {
+            nombre: file.nombreOriginal,
+            rutaCompleta: rutaLimpia,
+            url: urlData.publicUrl,
+            extension,
+            tipoIcono
+          };
+        });
+
+        setArchivosStorage(archivosConUrl);
       } catch (err) {
         console.error("Error al listar archivos del storage:", err);
         setArchivosStorage([]);
@@ -257,8 +277,6 @@ export default function AdminLogin() {
             const urlWhatsApp = `https://wa.me/${tel}?text=${encodeURIComponent(mensaje)}`;
             window.open(urlWhatsApp, '_blank');
           }
-        } else {
-          alert("El estado se actualizó, pero el usuario no tiene cargado un número de teléfono/WhatsApp para notificarlo.");
         }
       }
 
@@ -270,14 +288,24 @@ export default function AdminLogin() {
   }
 
   async function eliminarRegistro(id) {
-    const confirmar = window.confirm("¿Estás seguro de querer eliminar este registro permanentemente?");
+    const confirmar = window.confirm("¿Estás seguro de querer eliminar este registro y su documentación permanentemente?");
     if (!confirmar) return;
 
     try {
+      const { data: listaArchivos, error: errorListar } = await supabase.storage
+        .from('documentos')
+        .list(id, { limit: 100 });
+
+      if (!errorListar && listaArchivos && listaArchivos.length > 0) {
+        const rutasABorrar = listaArchivos.map(file => `${id}/${file.name}`);
+        await supabase.storage.from('documentos').remove(rutasABorrar);
+      }
+
       await supabase.from('profesional_rubros').delete().eq('profesional_id', id);
       const { error } = await supabase.from('profesionales').delete().eq('id', id);
       if (error) throw error;
 
+      alert("Registro y archivos eliminados correctamente.");
       cargarSolicitudes();
       setSeleccionada(null);
     } catch (err) {
@@ -308,9 +336,9 @@ export default function AdminLogin() {
 
       if (error) {
         console.warn(error);
-        alert("Para cambiar la contraseña de forma directa, asegúrate de tener creada la función RPC en Supabase o usa el cambio manual. (Detalle: " + error.message + ")");
+        alert("Asegúrate de tener creada la función RPC en Supabase o usa el cambio manual. (Detalle: " + error.message + ")");
       } else {
-        alert(`¡Contraseña actualizada con éxito para ${emailProfesional}! Ya puede ingresar con su nueva clave.`);
+        alert(`¡Contraseña actualizada con éxito para ${emailProfesional}!`);
       }
     } catch (err) {
       alert("Ocurrió un error al actualizar la contraseña: " + err.message);
@@ -545,7 +573,7 @@ export default function AdminLogin() {
               <p className="mt-5 text-sm text-ink/80">{seleccionada.descripcion || "Sin descripción proporcionada."}</p>
 
               <div className="mt-6 border-t border-stone pt-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-copper mb-3">Documentación Adjunta</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-copper mb-3">Documentación Adjunta (Archivos individuales)</h3>
                 
                 <div className="flex flex-wrap gap-2">
                   {docEnTabla && (
@@ -553,9 +581,10 @@ export default function AdminLogin() {
                       href={docEnTabla}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-sm bg-stone/20 px-3 py-2 text-xs font-medium text-ink hover:bg-stone/30 border border-stone flex items-center gap-1 cursor-pointer"
+                      className="rounded-sm bg-stone/20 px-3 py-2 text-xs font-medium text-ink hover:bg-stone/30 border border-stone flex items-center gap-1.5 cursor-pointer"
                     >
-                      📄 Ver Documento Principal
+                      <span>📄</span>
+                      <span>Ver Documento Principal</span>
                     </a>
                   )}
 
@@ -565,17 +594,19 @@ export default function AdminLogin() {
                       href={file.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-sm bg-stone/20 px-3 py-2 text-xs font-medium text-ink hover:bg-stone/30 border border-stone flex items-center gap-1 cursor-pointer"
-                      title={`Archivo: ${file.nombre}`}
+                      className="rounded-sm bg-stone/20 px-3 py-2 text-xs font-medium text-ink hover:bg-stone/30 border border-stone flex items-center gap-1.5 cursor-pointer"
+                      title={`Abrir archivo: ${file.nombre}`}
                     >
                       <span>{file.tipoIcono}</span>
-                      <span className="truncate max-w-[140px]">{file.nombre}</span>
-                      <span className="text-[10px] text-ink/50 uppercase font-mono">({file.extension})</span>
+                      <span className="font-medium max-w-[160px] truncate">{file.nombre}</span>
+                      <span className="text-[10px] text-ink/50 uppercase font-mono bg-stone/30 px-1 py-0.5 rounded">
+                        {file.extension}
+                      </span>
                     </a>
                   ))}
 
                   {!docEnTabla && archivosStorage.length === 0 && (
-                    <p className="text-xs text-ink/40 italic">No hay archivos vinculados en el storage para este usuario.</p>
+                    <p className="text-xs text-ink/40 italic">No hay archivos ni carpetas en el Storage vinculados a este usuario.</p>
                   )}
                 </div>
               </div>

@@ -42,12 +42,12 @@ export default function SoyProfesional() {
   const [mostrarPasswordLogin, setMostrarPasswordLogin] = useState(false);
   const [mostrarPasswordRegistro, setMostrarPasswordRegistro] = useState(false);
 
-  // Estados de control y modal de verificación de WhatsApp
+  // Estados de control
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState("");
-  const [mostrarModalConfirmacion, setMostrarModalConfirmacion] = useState(false);
 
-  // Estado para mostrar botón manual al administrador tras el registro exitoso
+  // Estado para mostrar opciones y enlace al administrador tras el registro exitoso
+  const [registroExitoso, setRegistroExitoso] = useState(false);
   const [enlaceAdminWp, setEnlaceAdminWp] = useState("");
 
   // Tu número de administrador configurado
@@ -179,7 +179,8 @@ export default function SoyProfesional() {
     }
   }
 
-  function handlePreRegistro(e) {
+  // REGISTRO DIRECTO Y ÁGIL PARA EL PROFESIONAL
+  async function handleRegistro(e) {
     e.preventDefault();
     
     if (!nombreCompleto || !emailRegistro || !passwordRegistro || !whatsapp) {
@@ -197,18 +198,7 @@ export default function SoyProfesional() {
       return;
     }
 
-    const nombreFormateado = capitalizarNombre(nombreCompleto);
-    
-    const textoCredenciales = encodeURIComponent(`¡Hola ${nombreFormateado}!\n\nEstás a un paso de registrarte en ConectaOficios. Tus credenciales para cuando finalices serán:\n\n📧 Usuario / Email: ${emailRegistro}\n🔑 Contraseña: ${passwordRegistro}\n\nPor favor, volvé a la pantalla de la app y confirmá si te llegó este mensaje.`);
-    const whatsappLimpio = whatsapp.replace(/\D/g, "");
-    window.open(`https://wa.me/${whatsappLimpio}?text=${textoCredenciales}`, '_blank');
-
-    setMostrarModalConfirmacion(true);
-  }
-
-  async function confirmarRegistroYGuardar() {
     setCargando(true);
-    setMostrarModalConfirmacion(false);
 
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -232,7 +222,6 @@ export default function SoyProfesional() {
       async function subirArchivo(file, nombrePrefijo) {
         if (!file || !userId) return null;
         const fileExt = file.name.split('.').pop();
-        
         const fileName = `${userId}/${userId}-${nombrePrefijo}-${Math.random()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
@@ -301,10 +290,10 @@ export default function SoyProfesional() {
         await supabase.from('profesional_rubros').insert(relacionesARecordar);
       }
 
-      const textoAvisoAdmin = encodeURIComponent(`Nuevo registro en ConectaOficios:\n\n👤 Nombre: ${nombreFormateado}\n📱 WhatsApp: ${whatsapp}\n📧 Email: ${emailRegistro}\n📍 Localidad: ${localidad}\n\nIngresa al panel para aprobarlo o rechazarlo.`);
+      // Preparamos el enlace de WhatsApp para que el profesional o la app te notifique
+      const textoAvisoAdmin = encodeURIComponent(`Hola! Acabo de registrarme en ConectaOficios:\n\n👤 Nombre: ${nombreFormateado}\n📱 WhatsApp: ${whatsapp}\n📧 Email: ${emailRegistro}\n🔑 Contraseña provisoria: ${passwordRegistro}\n📍 Localidad: ${localidad}\n\nQuedo a la espera de la aprobación.`);
       setEnlaceAdminWp(`https://wa.me/${NUMERO_ADMIN}?text=${textoAvisoAdmin}`);
-
-      setMensaje("¡Registro guardado con éxito! Tu cuenta quedó pendiente de aprobación.");
+      setRegistroExitoso(true);
 
     } catch (err) {
       console.error(err);
@@ -396,33 +385,37 @@ export default function SoyProfesional() {
           <h1 className="font-display text-2xl font-bold text-ink">Registro de Profesional</h1>
           <p className="mt-1 text-sm text-ink/60">Completá tus datos, rubros y subí la documentación requerida para tu validación.</p>
 
-          {enlaceAdminWp ? (
+          {registroExitoso ? (
             <div className="mt-6 p-6 bg-green-50 border border-green-200 rounded-sm text-center space-y-4">
               <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
                 ✓
               </div>
-              <h3 className="font-display text-lg font-bold text-green-800">¡Registro Completado con Éxito!</h3>
+              <h3 className="font-display text-lg font-bold text-green-800">¡Registro Exitoso!</h3>
               <p className="text-xs text-green-700 leading-relaxed">
-                Tu solicitud fue guardada correctamente y se encuentra pendiente de aprobación. Tocá el siguiente botón para notificar formalmente al administrador por WhatsApp:
+                Tus datos fueron guardados correctamente y tu cuenta quedó pendiente de revisión. Tocá el botón para avisarle a ConectaOficio por WhatsApp y activar tu perfil:
               </p>
-              <a
-                href={enlaceAdminWp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block w-full bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-3 rounded-sm transition shadow-sm text-center cursor-pointer"
-              >
-                💬 Enviar aviso de alta al Administrador
-              </a>
-              <button
-                type="button"
-                onClick={() => { setEnlaceAdminWp(""); setModo("login"); }}
-                className="block w-full text-xs text-ink/60 hover:text-ink underline pt-2 cursor-pointer"
-              >
-                Ir a Iniciar Sesión
-              </button>
+              
+              <div className="pt-2 space-y-2">
+                <a
+                  href={enlaceAdminWp}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block w-full bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-3 rounded-sm transition shadow-sm text-center cursor-pointer"
+                >
+                  💬 Enviar datos de registro por WhatsApp a ConectaOficio
+                </a>
+                
+                <button
+                  type="button"
+                  onClick={() => { setRegistroExitoso(false); setModo("login"); }}
+                  className="block w-full bg-stone/20 hover:bg-stone/30 text-ink text-xs font-bold py-2.5 rounded-sm transition cursor-pointer"
+                >
+                  Ir a Iniciar Sesión
+                </button>
+              </div>
             </div>
           ) : (
-            <form onSubmit={handlePreRegistro} className="mt-6 space-y-6">
+            <form onSubmit={handleRegistro} className="mt-6 space-y-6">
               
               {/* 1. Datos Personales */}
               <div className="space-y-4 border-b border-stone pb-4">
@@ -441,7 +434,7 @@ export default function SoyProfesional() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Correo Electrónico</label>
+                  <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Correo Electrónico (Tu Usuario)</label>
                   <input
                     type="email"
                     required
@@ -671,7 +664,7 @@ export default function SoyProfesional() {
                 disabled={cargando || !aceptoContrato}
                 className="w-full rounded-sm bg-copper py-2.5 font-medium text-paper hover:opacity-90 cursor-pointer mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {cargando ? "Procesando..." : "Guardar y Verificar WhatsApp"}
+                {cargando ? "Guardando Registro..." : "Registrarse Ahora"}
               </button>
             </form>
           )}
@@ -687,41 +680,10 @@ export default function SoyProfesional() {
         </div>
       )}
 
-      {/* MODAL DE CONFIRMACIÓN EN PANTALLA */}
-      {mostrarModalConfirmacion && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-sm max-w-md w-full p-6 shadow-xl border border-stone space-y-4 text-center">
-            <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
-              📱
-            </div>
-            <h3 className="font-display text-lg font-bold text-ink">Verificá tu WhatsApp</h3>
-            <p className="text-xs text-ink/70 leading-relaxed">
-              Se abrió una pestaña de WhatsApp con tus credenciales de acceso. Por favor, chequea tu teléfono para ver si el mensaje llegó a destino correctamente.
-            </p>
-            <div className="bg-stone/10 p-3 rounded-sm text-[11px] text-ink/80 font-medium">
-              ¿Recibiste el mensaje en el número <span className="font-bold text-copper">{whatsapp}</span>?
-            </div>
-            
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setMostrarModalConfirmacion(false)}
-                className="flex-1 bg-stone/20 hover:bg-stone/30 text-ink text-xs font-bold py-2.5 rounded-sm transition cursor-pointer"
-              >
-                No, revisar número
-              </button>
-              <button
-                type="button"
-                disabled={cargando}
-                onClick={confirmarRegistroYGuardar}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2.5 rounded-sm transition cursor-pointer"
-              >
-                {cargando ? "Guardando..." : "Sí, correcto (Guardar)"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* TEXTO PEQUEÑO COLOCADO SIEMPRE AL PIE DE TODO */}
+      <p className="mt-3 text-center text-[11px] text-ink/50 italic px-2">
+        * Recordar tener a mano archivos del DNI (Frontal/Dorso), certificado de buena conducta y currículum vitae.
+      </p>
 
     </div>
   );
