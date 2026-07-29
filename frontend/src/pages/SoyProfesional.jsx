@@ -79,6 +79,36 @@ export default function SoyProfesional() {
       .join(" ");
   }
 
+  // Función de validación de archivos para proteger el almacenamiento gratuito (máx 5MB y formatos seguros)
+  function manejarCambioArchivo(e, setterArchivo) {
+    const archivo = e.target.files[0];
+    if (!archivo) {
+      setterArchivo(null);
+      return;
+    }
+
+    // Límite máximo: 5 MB por archivo
+    const TAMANO_MAXIMO = 5 * 1024 * 1024;
+    if (archivo.size > TAMANO_MAXIMO) {
+      alert("El archivo es demasiado pesado. El tamaño máximo permitido es de 5 MB para cuidar el almacenamiento.");
+      e.target.value = "";
+      setterArchivo(null);
+      return;
+    }
+
+    // Extensiones permitidas (Imágenes y PDFs, bloqueando videos pesados)
+    const extensionesValidas = ["jpg", "jpeg", "png", "webp", "pdf"];
+    const ext = archivo.name.split(".").pop().toLowerCase();
+    if (!extensionesValidas.includes(ext)) {
+      alert("Formato no permitido. Solo se aceptan imágenes (JPG, PNG, WEBP) o documentos PDF.");
+      e.target.value = "";
+      setterArchivo(null);
+      return;
+    }
+
+    setterArchivo(archivo);
+  }
+
   function handleCheckboxRubro(rubroId) {
     if (rubrosSeleccionados.includes(rubroId)) {
       setRubrosSeleccionados(rubrosSeleccionados.filter(id => id !== rubroId));
@@ -290,8 +320,8 @@ export default function SoyProfesional() {
         await supabase.from('profesional_rubros').insert(relacionesARecordar);
       }
 
-      // Preparamos el enlace de WhatsApp para que el profesional o la app te notifique
-      const textoAvisoAdmin = encodeURIComponent(`Hola! Acabo de registrarme en ConectaOficios:\n\n👤 Nombre: ${nombreFormateado}\n📱 WhatsApp: ${whatsapp}\n📧 Email: ${emailRegistro}\n🔑 Contraseña provisoria: ${passwordRegistro}\n📍 Localidad: ${localidad}\n\nQuedo a la espera de la aprobación.`);
+      // Enlace de WhatsApp actualizado a Conecta Oficios
+      const textoAvisoAdmin = encodeURIComponent(`Hola! Acabo de registrarme en Conecta Oficios:\n\n👤 Nombre: ${nombreFormateado}\n📱 WhatsApp: ${whatsapp}\n📧 Email: ${emailRegistro}\n🔑 Contraseña provisoria: ${passwordRegistro}\n📍 Localidad: ${localidad}\n\nQuedo a la espera de la aprobación.`);
       setEnlaceAdminWp(`https://wa.me/${NUMERO_ADMIN}?text=${textoAvisoAdmin}`);
       setRegistroExitoso(true);
 
@@ -329,7 +359,7 @@ export default function SoyProfesional() {
               <div className="flex justify-between items-center">
                 <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Contraseña</label>
                 <a
-                  href={`https://wa.me/${NUMERO_ADMIN}?text=${encodeURIComponent("Hola! Olvidé mi contraseña de acceso como profesional en ConectaOficios y necesito recuperarla. Mi correo registrado es: " + (emailLogin || "[completar correo]"))}`}
+                  href={`https://wa.me/${NUMERO_ADMIN}?text=${encodeURIComponent("Hola! Olvidé mi contraseña de acceso como profesional en Conecta Oficios y necesito recuperarla. Mi correo registrado es: " + (emailLogin || "[completar correo]"))}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[11px] text-green-700 hover:underline font-medium flex items-center gap-1 cursor-pointer"
@@ -392,7 +422,7 @@ export default function SoyProfesional() {
               </div>
               <h3 className="font-display text-lg font-bold text-green-800">¡Registro Exitoso!</h3>
               <p className="text-xs text-green-700 leading-relaxed">
-                Tus datos fueron guardados correctamente y tu cuenta quedó pendiente de revisión. Tocá el botón para avisarle a ConectaOficio por WhatsApp y activar tu perfil:
+                Tus datos fueron guardados correctamente y tu cuenta quedó pendiente de revisión. Tocá el botón para enviar los datos a Conecta Oficios por WhatsApp y activar tu perfil:
               </p>
               
               <div className="pt-2 space-y-2">
@@ -402,7 +432,7 @@ export default function SoyProfesional() {
                   rel="noopener noreferrer"
                   className="inline-block w-full bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-3 rounded-sm transition shadow-sm text-center cursor-pointer"
                 >
-                  💬 Enviar datos de registro por WhatsApp a ConectaOficio
+                  💬 Enviar datos de registro por WhatsApp a Conecta Oficios
                 </a>
                 
                 <button
@@ -585,16 +615,17 @@ export default function SoyProfesional() {
                 </div>
               </div>
 
-              {/* 3. Documentación Requerida */}
+              {/* 3. Documentación Requerida (Con validación de tamaño y formato) */}
               <div className="space-y-4 border-b border-stone pb-4">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-copper">3. Documentación Requerida (Imágenes o PDF)</h2>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-copper">3. Documentación Requerida (Imágenes o PDF - Máx 5MB)</h2>
 
                 <div>
                   <label className="block text-xs font-medium text-ink/80">DNI - Frente</label>
                   <input
                     type="file"
                     required
-                    onChange={(e) => setDniFrente(e.target.files[0])}
+                    accept=".jpg,.jpeg,.png,.webp,.pdf"
+                    onChange={(e) => manejarCambioArchivo(e, setDniFrente)}
                     className="mt-1 w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
                   />
                 </div>
@@ -604,16 +635,18 @@ export default function SoyProfesional() {
                   <input
                     type="file"
                     required
-                    onChange={(e) => setDniDorso(e.target.files[0])}
+                    accept=".jpg,.jpeg,.png,.webp,.pdf"
+                    onChange={(e) => manejarCambioArchivo(e, setDniDorso)}
                     className="mt-1 w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-ink/80">Certificado de Matrícula (Opcional o según rubro)</label>
+                  <label className="block text-xs font-medium text-ink/80">Certificado de Matrícula (Opcional)</label>
                   <input
                     type="file"
-                    onChange={(e) => setCertificadoMatricula(e.target.files[0])}
+                    accept=".jpg,.jpeg,.png,.webp,.pdf"
+                    onChange={(e) => manejarCambioArchivo(e, setCertificadoMatricula)}
                     className="mt-1 w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
                   />
                 </div>
@@ -623,7 +656,8 @@ export default function SoyProfesional() {
                   <input
                     type="file"
                     required
-                    onChange={(e) => setCertificadoBuenaConducta(e.target.files[0])}
+                    accept=".jpg,.jpeg,.png,.webp,.pdf"
+                    onChange={(e) => manejarCambioArchivo(e, setCertificadoBuenaConducta)}
                     className="mt-1 w-full text-xs text-ink/70 file:mr-4 file:py-2 file:px-4 file:rounded-sm file:border-0 file:font-semibold file:bg-copper/10 file:text-copper hover:file:bg-copper/20 cursor-pointer"
                   />
                 </div>
@@ -654,7 +688,7 @@ export default function SoyProfesional() {
                     className="mt-0.5 rounded border-stone text-copper focus:ring-copper cursor-pointer"
                   />
                   <span className="text-xs font-medium text-ink">
-                    He leído, comprendido y acepto los términos del acuerdo de mantenimiento y aporte mensual de ConectaOficios.
+                    He leído, comprendido y acepto los términos del acuerdo de mantenimiento y aporte mensual de Conecta Oficios.
                   </span>
                 </label>
               </div>
@@ -682,7 +716,7 @@ export default function SoyProfesional() {
 
       {/* TEXTO PEQUEÑO COLOCADO SIEMPRE AL PIE DE TODO */}
       <p className="mt-3 text-center text-[11px] text-ink/50 italic px-2">
-        * Recordar tener a mano archivos del DNI (Frontal/Dorso), certificado de buena conducta y currículum vitae.
+        * Recordar tener a mano archivos de DNI (Frontal/Dorso), certificado de buena conducta y documentación requerida (máximo 5 MB por archivo).
       </p>
 
     </div>
