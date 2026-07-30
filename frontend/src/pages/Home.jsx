@@ -88,7 +88,7 @@ export default function Home() {
             <div className="bg-white p-6 rounded-lg border border-stone shadow-sm text-center">
               <span className="inline-block w-12 h-12 leading-12 rounded-full bg-copper text-paper font-bold text-xl mb-4">1</span>
               <h3 className="font-bold text-ink text-lg">Buscás</h3>
-              <p className="mt-2 text-sm text-ink/70">Ingresás tu nombre y seleccionás el oficio que necesitás.</p>
+              <p className="mt-2 text-sm text-ink/70">Seleccionás el oficio que necesitás o usás la búsqueda inteligente.</p>
             </div>
             <div className="bg-white p-6 rounded-lg border border-stone shadow-sm text-center">
               <span className="inline-block w-12 h-12 leading-12 rounded-full bg-copper text-paper font-bold text-xl mb-4">2</span>
@@ -98,7 +98,7 @@ export default function Home() {
             <div className="bg-white p-6 rounded-lg border border-stone shadow-sm text-center">
               <span className="inline-block w-12 h-12 leading-12 rounded-full bg-copper text-paper font-bold text-xl mb-4">3</span>
               <h3 className="font-bold text-ink text-lg">Contactás</h3>
-              <p className="mt-2 text-sm text-ink/70">Te comunicás directamente para coordinar el trabajo de forma ágil.</p>
+              <p className="mt-2 text-sm text-ink/70">Te comunicás directamente por WhatsApp para coordinar el trabajo.</p>
             </div>
           </div>
         </div>
