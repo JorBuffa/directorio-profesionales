@@ -39,9 +39,7 @@ function capitalizarTexto(texto) {
 
 export default function Buscar() {
   const [paso, setPaso] = useState("rubros");
-  
   const [ubicacionCliente, setUbicacionCliente] = useState(null);
-
   const [rubros, setRubros] = useState([]);
   const [rubroSeleccionado, setRubroSeleccionado] = useState(null);
   const [profesionales, setProfesionales] = useState([]);
@@ -106,39 +104,30 @@ export default function Buscar() {
     }
   }
 
-  // Función robusta mejorada para mapear el texto libre al rubro correcto de Supabase
   function procesarTextoBúsqueda(texto) {
     const textoMinuscula = texto.toLowerCase();
     
-    // 1. Plomería
     if (textoMinuscula.includes("canilla") || textoMinuscula.includes("agua") || textoMinuscula.includes("fuga") || textoMinuscula.includes("pérdida") || textoMinuscula.includes("inodoro") || textoMinuscula.includes("caño") || textoMinuscula.includes("gotera") || textoMinuscula.includes("plomeria")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("plom"));
     }
-    // 2. Gasista
     if (textoMinuscula.includes("gas") || textoMinuscula.includes("estufa") || textoMinuscula.includes("calefón") || textoMinuscula.includes("termotanque") || textoMinuscula.includes("cocina")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("gas"));
     }
-    // 3. Electricista
     if (textoMinuscula.includes("luz") || textoMinuscula.includes("corto") || textoMinuscula.includes("enchufe") || textoMinuscula.includes("foco") || textoMinuscula.includes("térmica") || textoMinuscula.includes("electricidad")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("electric"));
     }
-    // 4. Albañil
     if (textoMinuscula.includes("pared") || textoMinuscula.includes("humedad") || textoMinuscula.includes("piso") || textoMinuscula.includes("techo") || textoMinuscula.includes("ladrillo") || textoMinuscula.includes("construccion")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("albañil") || r.nombre.toLowerCase().includes("albanil"));
     }
-    // 5. Pintor
     if (textoMinuscula.includes("pintura") || textoMinuscula.includes("pintar") || textoMinuscula.includes("cielorraso")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("pintor"));
     }
-    // 6. Informática / Computación (Incluye ordenador, pc, notebook, rompió, etc.)
     if (textoMinuscula.includes("computadora") || textoMinuscula.includes("pc") || textoMinuscula.includes("notebook") || textoMinuscula.includes("ordenador") || textoMinuscula.includes("laptop") || textoMinuscula.includes("pantalla") || textoMinuscula.includes("celular") || textoMinuscula.includes("impresora") || textoMinuscula.includes("wifi") || textoMinuscula.includes("rompió")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("informát") || r.nombre.toLowerCase().includes("comput") || r.nombre.toLowerCase().includes("tecn") || r.nombre.toLowerCase().includes("sistema"));
     }
-    // 7. Pastelería
     if (textoMinuscula.includes("budín") || textoMinuscula.includes("budin") || textoMinuscula.includes("torta") || textoMinuscula.includes("pastel") || textoMinuscula.includes("pan") || textoMinuscula.includes("dulce") || textoMinuscula.includes("postre") || textoMinuscula.includes("pasteleria")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("pasteler") || r.nombre.toLowerCase().includes("panader") || r.nombre.toLowerCase().includes("reposteri"));
     }
-    // 8. Jardinería
     if (textoMinuscula.includes("jardín") || textoMinuscula.includes("jardin") || textoMinuscula.includes("pasto") || textoMinuscula.includes("césped") || textoMinuscula.includes("cesped") || textoMinuscula.includes("parquización") || textoMinuscula.includes("parquizacion") || textoMinuscula.includes("poda") || textoMinuscula.includes("jardinero")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("jardin") || r.nombre.toLowerCase().includes("parquiza"));
     }
@@ -209,7 +198,7 @@ export default function Buscar() {
     .sort((a, b) => a.distanciaKm - b.distanciaKm);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-6">
       
       {paso === "rubros" && (
         <div>
@@ -283,26 +272,35 @@ export default function Buscar() {
       )}
 
       {paso === "resultados" && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-stone pb-4 gap-4">
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-stone pb-3 gap-3">
             <div>
-              <h1 className="font-display text-2xl font-bold text-ink">Profesionales más cercanos</h1>
-              <p className="text-sm text-ink/60">Resultados ordenados por cercanía.</p>
+              <h1 className="font-display text-xl sm:text-2xl font-bold text-ink">Profesionales más cercanos</h1>
+              <p className="text-xs sm:text-sm text-ink/60">Resultados ordenados por cercanía.</p>
             </div>
             <button
               onClick={() => setPaso("rubros")}
-              className="w-full sm:w-auto rounded-xl bg-copper px-5 py-3 text-sm font-bold text-paper shadow-md hover:bg-copper/90 transition flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto rounded-lg bg-copper px-4 py-2.5 text-xs sm:text-sm font-bold text-paper shadow-md hover:bg-copper/90 transition flex items-center justify-center gap-2 cursor-pointer"
             >
               🔍 Elegir otro rubro
             </button>
           </div>
 
-          <div className="h-[450px] w-full overflow-hidden rounded-sm border border-stone bg-white shadow-sm">
+          {/* MAPA GRANDE Y VISIBLE (h-[45vh] en celular para permitir ver los pines y hacer zoom, h-[450px] en PC) */}
+          <div className="h-[45vh] sm:h-[450px] w-full overflow-hidden rounded-lg border border-stone bg-white shadow-sm relative touch-pan-y">
             <MapView profesionales={profesionalesFiltrados} centroCliente={ubicacionCliente} />
           </div>
 
-          <div>
-            <h2 className="font-display text-xl font-bold text-ink mb-4">Listado de profesionales encontrados</h2>
+          {/* INDICADOR VISUAL SUTIL PARA EL USUARIO MÓVIL */}
+          <div className="text-center py-1 sm:hidden">
+            <span className="text-[11px] text-stone-dark font-medium bg-stone/20 px-3 py-1 rounded-full">
+              👇 Deslizá hacia abajo para ver las fichas
+            </span>
+          </div>
+
+          {/* LISTADO DE PROFESIONALES ADAPTATIVO DEBAJO */}
+          <div className="pt-2">
+            <h2 className="font-display text-lg sm:text-xl font-bold text-ink mb-3">Listado de profesionales encontrados</h2>
 
             {profesionalesFiltrados.length === 0 ? (
               <div className="rounded-sm border border-stone bg-white p-6 text-center">
@@ -316,12 +314,12 @@ export default function Buscar() {
                   const linkWhatsapp = telWp ? `https://wa.me/${telWp.replace(/\D/g, '')}?text=${mensajeWp}` : "#";
 
                   return (
-                    <div key={p.id} className="rounded-sm border border-stone bg-white p-5 shadow-sm relative flex flex-col justify-between">
+                    <div key={p.id} className="rounded-sm border border-stone bg-white p-4 sm:p-5 shadow-sm relative flex flex-col justify-between">
                       <div>
                         <span className="absolute top-4 right-4 rounded-full bg-copper/10 px-2.5 py-1 font-mono text-xs font-bold text-copper-dark">
                           #{index + 1} ({p.distanciaKm.toFixed(1)} km)
                         </span>
-                        <h3 className="font-display text-lg font-bold text-ink pr-16">{p.nombre_completo || p.nombre}</h3>
+                        <h3 className="font-display text-base sm:text-lg font-bold text-ink pr-16">{p.nombre_completo || p.nombre}</h3>
                         <p className="text-xs uppercase tracking-wide text-stone-dark font-medium mt-0.5">
                           {p.direccion}, {p.localidad || "Unquillo"}
                         </p>
