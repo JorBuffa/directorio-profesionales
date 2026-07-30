@@ -10,8 +10,8 @@ const diccionarioRubros = {
   electricista: ["luz", "corto", "enchufes", "foco", "térmica", "disyuntor", "cable", "apagón", "electricidad", "toma", "corriente"],
   albanil: ["pared", "humedad", "piso", "techo", "revoque", "ladrillo", "cemento", "grieta", "ampliación", "construccion"],
   pintor: ["pintura", "paredes", "humedad", "impermeabilizar", "latex", "manchas", "cielorraso", "pintar"],
-  "técnico informático": ["computadora", "pc", "notebook", "pantalla", "celular", "impresora", "internet", "wifi", "virus", "tecnologia", "sistema", "tecnico"],
-  computación: ["computadora", "pc", "notebook", "pantalla", "celular", "impresora", "internet", "wifi", "virus", "tecnologia", "sistema", "tecnico"],
+  "técnico informático": ["computadora", "pc", "notebook", "ordenador", "laptop", "pantalla", "celular", "impresora", "internet", "wifi", "virus", "tecnologia", "sistema", "tecnico", "rompió", "roto"],
+  computación: ["computadora", "pc", "notebook", "ordenador", "laptop", "pantalla", "celular", "impresora", "internet", "wifi", "virus", "tecnologia", "sistema", "tecnico", "rompió", "roto"],
   pasteleria: ["budín", "budin", "torta", "pastel", "dulce", "pan", "panaderia", "facturas", "postre", "cumpleaños", "reposteria", "pasteleria"],
   jardineria: ["jardín", "jardin", "pasto", "césped", "cesped", "parquización", "parquizacion", "poda", "cortar pasto", "plantas", "arboles", "jardinero"]
 };
@@ -38,7 +38,6 @@ function capitalizarTexto(texto) {
 }
 
 export default function Buscar() {
-  // Arranca directamente en "rubros" omitiendo la pantalla de datos personales
   const [paso, setPaso] = useState("rubros");
   
   const [ubicacionCliente, setUbicacionCliente] = useState(null);
@@ -107,31 +106,39 @@ export default function Buscar() {
     }
   }
 
-  // Función robusta para mapear el texto libre al rubro correcto de Supabase
+  // Función robusta mejorada para mapear el texto libre al rubro correcto de Supabase
   function procesarTextoBúsqueda(texto) {
     const textoMinuscula = texto.toLowerCase();
     
+    // 1. Plomería
     if (textoMinuscula.includes("canilla") || textoMinuscula.includes("agua") || textoMinuscula.includes("fuga") || textoMinuscula.includes("pérdida") || textoMinuscula.includes("inodoro") || textoMinuscula.includes("caño") || textoMinuscula.includes("gotera") || textoMinuscula.includes("plomeria")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("plom"));
     }
+    // 2. Gasista
     if (textoMinuscula.includes("gas") || textoMinuscula.includes("estufa") || textoMinuscula.includes("calefón") || textoMinuscula.includes("termotanque") || textoMinuscula.includes("cocina")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("gas"));
     }
+    // 3. Electricista
     if (textoMinuscula.includes("luz") || textoMinuscula.includes("corto") || textoMinuscula.includes("enchufe") || textoMinuscula.includes("foco") || textoMinuscula.includes("térmica") || textoMinuscula.includes("electricidad")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("electric"));
     }
+    // 4. Albañil
     if (textoMinuscula.includes("pared") || textoMinuscula.includes("humedad") || textoMinuscula.includes("piso") || textoMinuscula.includes("techo") || textoMinuscula.includes("ladrillo") || textoMinuscula.includes("construccion")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("albañil") || r.nombre.toLowerCase().includes("albanil"));
     }
+    // 5. Pintor
     if (textoMinuscula.includes("pintura") || textoMinuscula.includes("pintar") || textoMinuscula.includes("cielorraso")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("pintor"));
     }
-    if (textoMinuscula.includes("computadora") || textoMinuscula.includes("pc") || textoMinuscula.includes("notebook") || textoMinuscula.includes("pantalla") || textoMinuscula.includes("celular") || textoMinuscula.includes("impresora") || textoMinuscula.includes("wifi")) {
-      return rubros.find(r => r.nombre.toLowerCase().includes("informát") || r.nombre.toLowerCase().includes("comput") || r.nombre.toLowerCase().includes("tecn"));
+    // 6. Informática / Computación (Incluye ordenador, pc, notebook, rompió, etc.)
+    if (textoMinuscula.includes("computadora") || textoMinuscula.includes("pc") || textoMinuscula.includes("notebook") || textoMinuscula.includes("ordenador") || textoMinuscula.includes("laptop") || textoMinuscula.includes("pantalla") || textoMinuscula.includes("celular") || textoMinuscula.includes("impresora") || textoMinuscula.includes("wifi") || textoMinuscula.includes("rompió")) {
+      return rubros.find(r => r.nombre.toLowerCase().includes("informát") || r.nombre.toLowerCase().includes("comput") || r.nombre.toLowerCase().includes("tecn") || r.nombre.toLowerCase().includes("sistema"));
     }
+    // 7. Pastelería
     if (textoMinuscula.includes("budín") || textoMinuscula.includes("budin") || textoMinuscula.includes("torta") || textoMinuscula.includes("pastel") || textoMinuscula.includes("pan") || textoMinuscula.includes("dulce") || textoMinuscula.includes("postre") || textoMinuscula.includes("pasteleria")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("pasteler") || r.nombre.toLowerCase().includes("panader") || r.nombre.toLowerCase().includes("reposteri"));
     }
+    // 8. Jardinería
     if (textoMinuscula.includes("jardín") || textoMinuscula.includes("jardin") || textoMinuscula.includes("pasto") || textoMinuscula.includes("césped") || textoMinuscula.includes("cesped") || textoMinuscula.includes("parquización") || textoMinuscula.includes("parquizacion") || textoMinuscula.includes("poda") || textoMinuscula.includes("jardinero")) {
       return rubros.find(r => r.nombre.toLowerCase().includes("jardin") || r.nombre.toLowerCase().includes("parquiza"));
     }
@@ -204,7 +211,6 @@ export default function Buscar() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       
-      {/* SELECCIONAR RUBRO + BUSCADOR INTELIGENTE POR VOZ/TEXTO (VISTA INICIAL) */}
       {paso === "rubros" && (
         <div>
           <div className="flex items-center justify-between border-b border-stone pb-4">
@@ -214,13 +220,12 @@ export default function Buscar() {
             </div>
           </div>
 
-          {/* BUSCADOR INTELIGENTE POR TEXTO O VOZ */}
           <div className="mt-6 bg-copper/5 border border-copper/30 p-4 rounded-sm max-w-xl mx-auto">
             <label className="block text-xs font-bold uppercase tracking-wider text-copper mb-1">
               ✨ Búsqueda inteligente por voz o palabras clave
             </label>
             <p className="text-[11px] text-ink/70 mb-3">
-              Escribí o decí tu problema (Ej. <em>"Necesito cortar el pasto y podar"</em>, <em>"Quiero encargar un budín"</em>) y te conectamos al instante.
+              Escribí o decí tu problema (Ej. <em>"Se me rompió el ordenador"</em>, <em>"Quiero encargar un budín"</em>) y te conectamos al instante.
             </p>
             <form onSubmit={handleBusquedaInteligenteSubmit} className="relative flex items-center">
               <input
@@ -277,7 +282,6 @@ export default function Buscar() {
         </div>
       )}
 
-      {/* RESULTADOS: MAPA ARRIBA Y LISTADO DEBAJO */}
       {paso === "resultados" && (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-stone pb-4 gap-4">
@@ -293,12 +297,10 @@ export default function Buscar() {
             </button>
           </div>
 
-          {/* 1. MAPA GRANDE PRIMERO */}
           <div className="h-[450px] w-full overflow-hidden rounded-sm border border-stone bg-white shadow-sm">
             <MapView profesionales={profesionalesFiltrados} centroCliente={ubicacionCliente} />
           </div>
 
-          {/* 2. LISTADO DE PROFESIONALES DEBAJO DEL MAPA */}
           <div>
             <h2 className="font-display text-xl font-bold text-ink mb-4">Listado de profesionales encontrados</h2>
 
