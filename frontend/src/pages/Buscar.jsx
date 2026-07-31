@@ -100,13 +100,32 @@ export default function Buscar() {
 
   function procesarBusquedaInteligente(texto) {
     const textoMinuscula = texto.toLowerCase();
+    // Convertimos el texto en un array de palabras limpias para evaluar concordancias exactas de palabras
+    const palabrasTexto = textoMinuscula.replace(/[^\w\sáéíóúñ]/gi, '').split(/\s+/);
     const idsEncontrados = [];
+
+    // Función auxiliar para verificar si alguna palabra clave coincide como palabra completa o frase exacta
+    function contieneTermino(termino) {
+      const termLower = termino.toLowerCase();
+      if (termLower.includes(' ')) {
+        return textoMinuscula.includes(termLower);
+      }
+      return palabrasTexto.includes(termLower);
+    }
 
     // 0. BUSCAR PRIMERO EN EL DICCIONARIO DINÁMICO (EDUCADO DESDE EL ADMIN)
     sinonimosDinamicos.forEach(item => {
-      if (textoMinuscula.includes(item.palabra.toLowerCase())) {
-        if (!idsEncontrados.includes(item.rubro_id)) {
-          idsEncontrados.push(Number(item.rubro_id));
+      if (item.palabra) {
+        const palabraClave = item.palabra.toLowerCase().trim();
+        // Si la palabra clave tiene espacios o la palabra exacta está en el array
+        const coincide = palabraClave.includes(' ') 
+          ? textoMinuscula.includes(palabraClave) 
+          : palabrasTexto.includes(palabraClave);
+
+        if (coincide) {
+          if (item.rubro_id && !idsEncontrados.includes(item.rubro_id)) {
+            idsEncontrados.push(item.rubro_id);
+          }
         }
       }
     });
@@ -117,12 +136,8 @@ export default function Buscar() {
 
     // 1. DISEÑADOR / DISEÑO / GRÁFICA / 3D / VOLANTES
     const esBusquedaDeDiseno = 
-      textoMinuscula.includes("diseño") || textoMinuscula.includes("diseñador") || 
-      textoMinuscula.includes("diseñar") || textoMinuscula.includes("flyer") || 
-      textoMinuscula.includes("volante") || textoMinuscula.includes("tarjeta") || 
-      textoMinuscula.includes("logo") || textoMinuscula.includes("cartel") ||
-      textoMinuscula.includes("publicidad") || textoMinuscula.includes("grafico") ||
-      textoMinuscula.includes("3d") || textoMinuscula.includes("producto 3d");
+      palabrasTexto.some(p => ["diseño", "diseñador", "diseñar", "flyer", "volante", "tarjeta", "logo", "cartel", "publicidad", "grafico", "3d"].includes(p)) ||
+      textoMinuscula.includes("producto 3d");
 
     if (esBusquedaDeDiseno) {
       rubros.forEach(r => {
@@ -138,13 +153,10 @@ export default function Buscar() {
       });
     }
 
-    // 2. ELECTRÓNICA / EQUIPOS DE MÚSICA / AUDIO / ESTÉREO / AMPLIFICADOR
+    // 2. ELECTRÓNICA / EQUIPOS DE MÚSICA / AUDIO / ESTÉREO / AMPLIFICADOR / TV / PANTALLA
     const esBusquedaDeElectronica = 
-      textoMinuscula.includes("electrónic") || textoMinuscula.includes("electronica") ||
-      textoMinuscula.includes("audio") || textoMinuscula.includes("parlante") || 
-      textoMinuscula.includes("musica") || textoMinuscula.includes("equipo de música") || 
-      textoMinuscula.includes("equipo de musica") || textoMinuscula.includes("estéreo") || 
-      textoMinuscula.includes("estereo") || textoMinuscula.includes("amplificador");
+      palabrasTexto.some(p => ["electrónica", "electronica", "audio", "parlante", "musica", "música", "estéreo", "estereo", "amplificador", "tv", "tele", "televisor", "pantalla"].includes(p)) ||
+      textoMinuscula.includes("equipo de música") || textoMinuscula.includes("equipo de musica");
 
     if (esBusquedaDeElectronica) {
       rubros.forEach(r => {
@@ -157,18 +169,8 @@ export default function Buscar() {
 
     // 3. INFORMÁTICA / COMPUTACIÓN / ACCESORIOS / MOUSE / EXCEL / OFIMÁTICA / PROGRAMACIÓN / WEB
     const esBusquedaDeInformatica = 
-      textoMinuscula.includes("computación") || textoMinuscula.includes("computacion") ||
-      textoMinuscula.includes("informát") || textoMinuscula.includes("informat") ||
-      textoMinuscula.includes("computadora") || textoMinuscula.includes("pc") || 
-      textoMinuscula.includes("notebook") || textoMinuscula.includes("ordenador") || 
-      textoMinuscula.includes("laptop") || textoMinuscula.includes("mouse") || 
-      textoMinuscula.includes("teclado") || textoMinuscula.includes("excel") || 
-      textoMinuscula.includes("planilla") || textoMinuscula.includes("ofimática") || 
-      textoMinuscula.includes("ofimatica") || textoMinuscula.includes("programa") || 
-      textoMinuscula.includes("programar") || textoMinuscula.includes("diseño web") || 
-      textoMinuscula.includes("web") || textoMinuscula.includes("app") || 
-      textoMinuscula.includes("aplicación") || textoMinuscula.includes("impresora") || 
-      textoMinuscula.includes("wifi") || textoMinuscula.includes("cpu");
+      palabrasTexto.some(p => ["computación", "computacion", "informática", "informatica", "computadora", "pc", "notebook", "ordenador", "laptop", "mouse", "teclado", "excel", "planilla", "ofimática", "ofimatica", "programa", "programar", "web", "app", "aplicación", "impresora", "wifi", "cpu"].includes(p)) ||
+      textoMinuscula.includes("diseño web");
 
     if (esBusquedaDeInformatica) {
       rubros.forEach(r => {
@@ -180,56 +182,39 @@ export default function Buscar() {
     }
 
     // 4. PLOMERÍA / PLOMERO
-    if (textoMinuscula.includes("plomer") || textoMinuscula.includes("canilla") || textoMinuscula.includes("agua") || textoMinuscula.includes("fuga") || textoMinuscula.includes("pérdida") || textoMinuscula.includes("inodoro") || textoMinuscula.includes("caño") || textoMinuscula.includes("gotera")) {
+    if (palabrasTexto.some(p => ["plomero", "plomería", "plomeria", "canilla", "agua", "fuga", "pérdida", "perdida", "inodoro", "caño", "gotera"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("plom"));
       if (match) idsEncontrados.push(match.id);
     }
 
     // 5. ELECTRICIDAD / ELECTRICISTA
-    if (textoMinuscula.includes("electric") || textoMinuscula.includes("luz") || textoMinuscula.includes("cable") || textoMinuscula.includes("corto") || textoMinuscula.includes("enchufe") || textoMinuscula.includes("foco") || textoMinuscula.includes("térmica") || textoMinuscula.includes("cortocircuito")) {
+    if (palabrasTexto.some(p => ["electricista", "electricidad", "luz", "cable", "corto", "enchufe", "foco", "térmica", "termica", "cortocircuito"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("electric"));
       if (match) idsEncontrados.push(match.id);
     }
 
     // 6. ALBAÑILERÍA / ALBAÑIL
-    if (textoMinuscula.includes("albañil") || textoMinuscula.includes("albanil") || textoMinuscula.includes("pared") || textoMinuscula.includes("humedad") || textoMinuscula.includes("piso") || textoMinuscula.includes("techo") || textoMinuscula.includes("ladrillo") || textoMinuscula.includes("construccion")) {
+    if (palabrasTexto.some(p => ["albañil", "albanil", "albañilería", "albanileria", "pared", "humedad", "piso", "techo", "ladrillo", "construccion", "construcción"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("albañil") || r.nombre.toLowerCase().includes("albanil"));
       if (match) idsEncontrados.push(match.id);
     }
 
     // 7. JARDINERÍA / JARDINERO / PARQUERO / PASTO
-    if (textoMinuscula.includes("jardin") || textoMinuscula.includes("parquer") || textoMinuscula.includes("pasto") || textoMinuscula.includes("césped") || textoMinuscula.includes("cesped") || textoMinuscula.includes("parquiza") || textoMinuscula.includes("poda")) {
+    if (palabrasTexto.some(p => ["jardin", "jardín", "jardinero", "parquero", "pasto", "césped", "cesped", "parquiza", "poda"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("jardin") || r.nombre.toLowerCase().includes("parquiza"));
       if (match) idsEncontrados.push(match.id);
     }
 
     // 8. GASISTA / GAS
-    if (textoMinuscula.includes("gas") || textoMinuscula.includes("estufa") || textoMinuscula.includes("calefón") || textoMinuscula.includes("termotanque") || textoMinuscula.includes("cocina")) {
+    if (palabrasTexto.some(p => ["gas", "gasista", "estufa", "calefón", "calefon", "termotanque", "cocina"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("gas"));
       if (match) idsEncontrados.push(match.id);
     }
 
     // 9. PASTELERÍA / PASTELERO / DONAS / MINI DONAS / BUDÍN
     if (
-      textoMinuscula.includes("pastel") || 
-      textoMinuscula.includes("budín") || 
-      textoMinuscula.includes("budin") || 
-      textoMinuscula.includes("torta") || 
-      textoMinuscula.includes("pan") || 
-      textoMinuscula.includes("dulce") || 
-      textoMinuscula.includes("postre") || 
-      textoMinuscula.includes("reposteri") ||
-      textoMinuscula.includes("dona") ||
-      textoMinuscula.includes("donas") ||
-      textoMinuscula.includes("minidona") ||
-      textoMinuscula.includes("minidonas") ||
-      textoMinuscula.includes("mini dona") ||
-      textoMinuscula.includes("mini donas") ||
-      textoMinuscula.includes("donna") ||
-      textoMinuscula.includes("donnas") ||
-      textoMinuscula.includes("minidonna") ||
-      textoMinuscula.includes("minidonnas") ||
-      textoMinuscula.includes("donut")
+      palabrasTexto.some(p => ["pastel", "pastelero", "pastelería", "pasteleria", "budín", "budin", "torta", "pan", "dulce", "postre", "repostería", "reposteria", "dona", "donas", "donna", "donnas", "donut", "donuts"].includes(p)) ||
+      textoMinuscula.includes("mini dona") || textoMinuscula.includes("mini donas") || textoMinuscula.includes("minidona") || textoMinuscula.includes("minidonas")
     ) {
       const match = rubros.find(r => {
         const nom = r.nombre.toLowerCase();
@@ -239,19 +224,19 @@ export default function Buscar() {
     }
 
     // 10. ESTILISTA / UÑAS / PESTAÑAS / BELLEZA
-    if (textoMinuscula.includes("estilista") || textoMinuscula.includes("uñas") || textoMinuscula.includes("pestaña") || textoMinuscula.includes("peluquer") || textoMinuscula.includes("maquillaje") || textoMinuscula.includes("belleza")) {
+    if (palabrasTexto.some(p => ["estilista", "uñas", "uñas", "pestaña", "pestañas", "peluquería", "peluqueria", "peluquero", "maquillaje", "belleza"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("estilis") || r.nombre.toLowerCase().includes("peluquer") || r.nombre.toLowerCase().includes("belleza"));
       if (match) idsEncontrados.push(match.id);
     }
 
     // 11. REFRIGERACIÓN / AIRE ACONDICIONADO / HELADERA / FREEZER
-    if (textoMinuscula.includes("refrigeración") || textoMinuscula.includes("refrigeracion") || textoMinuscula.includes("aire acondicionado") || textoMinuscula.includes("heladera") || textoMinuscula.includes("freezer")) {
+    if (palabrasTexto.some(p => ["refrigeración", "refrigeracion", "heladera", "freezer"].includes(p)) || textoMinuscula.includes("aire acondicionado")) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("refrigerac") || r.nombre.toLowerCase().includes("aire"));
       if (match) idsEncontrados.push(match.id);
     }
 
     // 12. PINTURA / PINTOR
-    if (textoMinuscula.includes("pintor") || textoMinuscula.includes("pintura") || textoMinuscula.includes("pintar") || textoMinuscula.includes("cielorraso")) {
+    if (palabrasTexto.some(p => ["pintor", "pintura", "pintar", "cielorraso"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("pintor"));
       if (match) idsEncontrados.push(match.id);
     }
@@ -259,7 +244,8 @@ export default function Buscar() {
     // 13. Búsqueda genérica por nombre de rubro directo
     if (idsEncontrados.length === 0) {
       rubros.forEach(r => {
-        if (r.nombre.toLowerCase().includes(textoMinuscula)) {
+        const nombreRubro = r.nombre.toLowerCase();
+        if (palabrasTexto.some(p => nombreRubro.includes(p) && p.length > 3)) {
           idsEncontrados.push(r.id);
         }
       });
@@ -270,7 +256,7 @@ export default function Buscar() {
       const profesionalesQueCoinciden = profesionales.filter(p => {
         const desc = (p.descripcion || "").toLowerCase();
         const nombreProf = (p.nombre_completo || p.nombre || "").toLowerCase();
-        return desc.includes(textoMinuscula) || nombreProf.includes(textoMinuscula);
+        return palabrasTexto.some(p => p.length > 3 && (desc.includes(p) || nombreProf.includes(p)));
       });
 
       if (profesionalesQueCoinciden.length > 0) {
