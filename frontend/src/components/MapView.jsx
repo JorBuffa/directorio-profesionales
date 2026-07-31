@@ -1,4 +1,5 @@
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -20,6 +21,40 @@ const iconoProfesional = new L.Icon({
   shadowSize: [41, 41]
 });
 
+// Componente auxiliar para ajustar automáticamente el zoom y encuadrar todos los pines visibles
+function AjustarMapa({ profesionales, centroCliente }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const puntos = [];
+
+    // Agregar la ubicación del cliente si existe
+    if (centroCliente && centroCliente.lat && centroCliente.lng) {
+      puntos.push([centroCliente.lat, centroCliente.lng]);
+    }
+
+    // Agregar las ubicaciones de todos los profesionales filtrados
+    profesionales.forEach((p) => {
+      const lat = p.latFinal || p.lat || p.latitud;
+      const lng = p.lngFinal || p.lng || p.longitud;
+      if (lat && lng) {
+        puntos.push([parseFloat(lat), parseFloat(lng)]);
+      }
+    });
+
+    // Si hay puntos para mostrar, ajustamos los límites del mapa automáticamente
+    if (puntos.length > 0) {
+      const bounds = L.latLngBounds(puntos);
+      map.fitBounds(bounds, {
+        padding: [50, 50], // Margen en píxeles para que los pines no queden pegados al borde
+        maxZoom: 15        // Evita que haga un zoom excesivo si hay un solo profesional muy cerca
+      });
+    }
+  }, [profesionales, centroCliente, map]);
+
+  return null;
+}
+
 export default function MapView({ profesionales = [], centroCliente = null }) {
   const defaultCenter = centroCliente ? [centroCliente.lat, centroCliente.lng] : [-31.2333, -64.3167];
 
@@ -35,6 +70,9 @@ export default function MapView({ profesionales = [], centroCliente = null }) {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       
+      {/* Componente dinámico que ajusta el encuadre de los pines */}
+      <AjustarMapa profesionales={profesionales} centroCliente={centroCliente} />
+
       {centroCliente && (
         <Marker position={[centroCliente.lat, centroCliente.lng]} icon={iconoCliente}>
           <Popup>
