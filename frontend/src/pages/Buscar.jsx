@@ -464,7 +464,7 @@ export default function Buscar() {
 
           <div className="text-center py-1 sm:hidden">
             <span className="text-[11px] text-stone-dark font-medium bg-stone/20 px-3 py-1 rounded-full">
-              👇 Deslizá hacia abajo para ver las fichas
+              👆 Deslizá hacia arriba para ver las fichas
             </span>
           </div>
 
