@@ -473,7 +473,7 @@ export default function AdminLogin() {
 
             {error && (
               <p className="rounded-sm bg-copper/10 p-2 text-xs font-medium text-copper-dark">
-                Contraseña incorrecta (es 1478).
+                Contraseña incorrecta
               </p>
             )}
 
