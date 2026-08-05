@@ -37,14 +37,56 @@ export default function AdminDiccionario() {
       return;
     }
 
-    const { error } = await supabase
-      .from('diccionario_sinonimos')
-      .insert([{ palabra: nuevaPalabra.toLowerCase(), rubro_id: rubroSeleccionado }]);
+    const palabraLimpia = nuevaPalabra.toLowerCase().trim();
+    setMensaje("");
 
-    if (error) {
-      alert("Error al guardar: " + error.message);
+    // 1. Verificamos si ya existe una fila para este rubro en el diccionario
+    const { data: existente, error: errorBusqueda } = await supabase
+      .from('diccionario_sinonimos')
+      .select('*')
+      .eq('rubro_id', rubroSeleccionado)
+      .maybeSingle();
+
+    if (errorBusqueda) {
+      alert("Error al buscar en el diccionario: " + errorBusqueda.message);
+      return;
+    }
+
+    let errorSupabase = null;
+
+    if (existente) {
+      // 2. Si ya existe, unimos la palabra nueva a las anteriores separadas por coma
+      let palabrasActuales = existente.palabra ? existente.palabra.split(',').map(p => p.trim()) : [];
+      
+      if (!palabrasActuales.includes(palabraLimpia)) {
+        palabrasActuales.push(palabraLimpia);
+        const palabrasActualizadas = palabrasActuales.join(', ');
+
+        // Actualizamos la misma fila existente
+        const { error } = await supabase
+          .from('diccionario_sinonimos')
+          .update({ palabra: palabrasActualizadas })
+          .eq('id', existente.id);
+        
+        errorSupabase = error;
+      } else {
+        setMensaje(`¡La palabra "${palabraLimpia}" ya estaba guardada en este rubro!`);
+        setNuevaPalabra("");
+        return;
+      }
     } else {
-      setMensaje(`¡Palabra "${nuevaPalabra}" aprendida con éxito!`);
+      // 3. Si no existe ninguna fila para este rubro, creamos la primera
+      const { error } = await supabase
+        .from('diccionario_sinonimos')
+        .insert([{ palabra: palabraLimpia, rubro_id: rubroSeleccionado }]);
+      
+      errorSupabase = error;
+    }
+
+    if (errorSupabase) {
+      alert("Error al guardar: " + errorSupabase.message);
+    } else {
+      setMensaje(`¡Palabra "${nuevaPalabra}" agregada con éxito!`);
       setNuevaPalabra("");
     }
   }

@@ -207,7 +207,7 @@ export default function SoyProfesional() {
     }
   }
 
-  // REGISTRO DIRECTO Y ÁGIL PARA EL PROFESIONAL
+  // REGISTRO DIRECTO Y ÁGIL PARA EL PROFESIONAL (SIN CREAR RUBROS AUTOMÁTICOS)
   async function handleRegistro(e) {
     e.preventDefault();
     
@@ -217,7 +217,7 @@ export default function SoyProfesional() {
     }
 
     if (rubrosSeleccionados.length === 0 && !nuevoRubro.trim()) {
-      alert("Por favor selecciona al menos un rubro u oficio.");
+      alert("Por favor selecciona al menos un rubro u oficio o escribe uno manual.");
       return;
     }
 
@@ -250,7 +250,6 @@ export default function SoyProfesional() {
       async function subirArchivo(file, nombrePrefijo) {
         if (!file || !userId) return null;
         const fileExt = file.name.split('.').pop();
-        // Guardamos usando una nomenclatura limpia dentro de la carpeta del ID del usuario en el bucket 'documentos'
         const fileName = `${userId}/${nombrePrefijo}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
@@ -271,7 +270,9 @@ export default function SoyProfesional() {
 
       urlDocumentacionPrincipal = urlDniFrente;
       const nombreFormateado = capitalizarNombre(nombreCompleto);
+      const rubroManualLimpio = nuevoRubro.trim() !== "" ? capitalizarTexto(nuevoRubro) : null;
 
+      // 1. Guardar el perfil incluyendo el rubro personalizado a evaluar
       const { error: dbError } = await supabase.from('profesionales').insert([
         {
           id: userId,
@@ -285,6 +286,7 @@ export default function SoyProfesional() {
           longitud: longitud ? parseFloat(longitud) : null,
           descripcion: descripcion,
           documentacion_url: urlDocumentacionPrincipal,
+          rubro_personalizado: rubroManualLimpio, // Queda pendiente para revisión administrativa
           estado: 'pendiente'
         }
       ]);
@@ -295,23 +297,9 @@ export default function SoyProfesional() {
         return;
       }
 
-      let listaRubrosIdsFinales = [...rubrosSeleccionados];
-
-      if (nuevoRubro.trim() !== "") {
-        const rubroFormateado = capitalizarTexto(nuevoRubro);
-        const { data: nuevoRubroData, error: errorNuevoRubro } = await supabase
-          .from('rubros')
-          .insert([{ nombre: rubroFormateado }])
-          .select()
-          .single();
-
-        if (!errorNuevoRubro && nuevoRubroData) {
-          listaRubrosIdsFinales.push(nuevoRubroData.id);
-        }
-      }
-
-      if (listaRubrosIdsFinales.length > 0 && userId) {
-        const relacionesARecordar = listaRubrosIdsFinales.map(rId => ({
+      // 2. Asociar únicamente los rubros oficiales seleccionados en las casillas
+      if (rubrosSeleccionados.length > 0 && userId) {
+        const relacionesARecordar = rubrosSeleccionados.map(rId => ({
           profesional_id: userId,
           rubro_id: rId
         }));
@@ -319,7 +307,10 @@ export default function SoyProfesional() {
         await supabase.from('profesional_rubros').insert(relacionesARecordar);
       }
 
-      const textoAvisoAdmin = encodeURIComponent(`Hola! Acabo de registrarme en Conecta Oficios:\n\n👤 Nombre: ${nombreFormateado}\n📱 WhatsApp: ${whatsapp}\n📧 Email: ${emailRegistro}\n🔑 Contraseña provisoria: ${passwordRegistro}\n📍 Localidad: ${localidad}\n\nQuedo a la espera de la aprobación.`);
+      // 3. Preparar mensaje para el WhatsApp del Administrador incluyendo el rubro manual si existe
+      const textoRubroManualAdicional = rubroManualLimpio ? `\n🛠️ Rubro sugerido a mano: *${rubroManualLimpio}*` : "";
+      const textoAvisoAdmin = encodeURIComponent(`Hola! Acabo de registrarme en Conecta Oficios:\n\n👤 Nombre: ${nombreFormateado}\n📱 WhatsApp: ${whatsapp}\n📧 Email: ${emailRegistro}\n📍 Localidad: ${localidad}${textoRubroManualAdicional}\n\nQuedo a la espera de la aprobación.`);
+      
       setEnlaceAdminWp(`https://wa.me/${NUMERO_ADMIN}?text=${textoAvisoAdmin}`);
       setRegistroExitoso(true);
 
@@ -356,14 +347,32 @@ export default function SoyProfesional() {
             <div>
               <div className="flex justify-between items-center">
                 <label className="block text-xs font-medium uppercase tracking-wider text-ink/60">Contraseña</label>
-                <a
-                  href={`https://wa.me/${NUMERO_ADMIN}?text=${encodeURIComponent("Hola! Olvidé mi contraseña de acceso como profesional en Conecta Oficios y necesito recuperarla. Mi correo registrado es: " + (emailLogin || "[completar correo]"))}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[11px] text-green-700 hover:underline font-medium flex items-center gap-1 cursor-pointer"
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!emailLogin) {
+                      alert("Por favor, escribí primero tu correo electrónico arriba para poder recuperar tu contraseña.");
+                      return;
+                    }
+                    const confirmar = window.confirm(`¿Querés enviar un correo de recuperación para la cuenta: ${emailLogin}?`);
+                    if (!confirmar) return;
+
+                    setCargando(true);
+                    const { error } = await supabase.auth.resetPasswordForEmail(emailLogin, {
+                      redirectTo: `${window.location.origin}/actualizar-contrasena`,
+                    });
+                    setCargando(false);
+
+                    if (error) {
+                      alert("Error al enviar el correo: " + error.message);
+                    } else {
+                      alert("¡Correo enviado con éxito! Revisá tu bandeja de entrada o correo no deseado para restablecer tu contraseña.");
+                    }
+                  }}
+                  className="text-[11px] text-copper hover:underline font-medium flex items-center gap-1 cursor-pointer bg-transparent border-none p-0"
                 >
                   💬 ¿Olvidaste tu contraseña?
-                </a>
+                </button>
               </div>
               <div className="relative mt-1">
                 <input
@@ -600,6 +609,9 @@ export default function SoyProfesional() {
                     placeholder="Ej. Gasista Matriculado"
                     className="mt-1 w-full rounded-sm border border-copper px-3 py-2 text-ink focus:outline-none bg-copper/5"
                   />
+                  <p className="text-[11px] text-ink/50 mt-1">
+                    Si escribes uno aquí, no se creará solo; la administración lo evaluará para crearlo u ordenarlo correctamente.
+                  </p>
                 </div>
 
                 <div>
@@ -619,7 +631,7 @@ export default function SoyProfesional() {
                 <h2 className="text-xs font-bold uppercase tracking-wider text-copper">3. Documentación Requerida (Imágenes o PDF - Máx 5MB)</h2>
 
                 <div>
-                  <label className="block text-xs font-medium text-ink/80">DNI - Frente</label>
+                  <label className="block text-xs font-medium text-ink/80">DNI - Frente (selfie con dni en mano)</label>
                   <input
                     type="file"
                     required
@@ -651,7 +663,7 @@ export default function SoyProfesional() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-ink/80">Certificado de Buena Conducta</label>
+                  <label className="block text-xs font-medium text-ink/80">Currículum Vitae</label>
                   <input
                     type="file"
                     required
@@ -716,7 +728,7 @@ export default function SoyProfesional() {
 
       {/* TEXTO PEQUEÑO COLOCADO SIEMPRE AL PIE DE TODO */}
       <p className="mt-3 text-center text-[11px] text-ink/50 italic px-2">
-        * Recordar tener a mano archivos de DNI (Frontal/Dorso), certificado de buena conducta y documentación requerida (máximo 5 MB por archivo).
+        * Recordar tener a mano archivos de DNI (Frontal/Dorso), currículum vitae y documentación requerida (máximo 5 MB por archivo).
       </p>
 
     </div>

@@ -1,4 +1,6 @@
-import { Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
+import { Routes, Route, useNavigate } from "react-router-dom";
+import { supabase } from "./api/supabaseClient";
 import Navbar from "./components/Navbar.jsx";
 import Footer from "./components/Footer.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
@@ -12,8 +14,24 @@ import AdminLogin from "./pages/AdminLogin.jsx";
 import Admin from "./pages/Admin.jsx";
 import Terminos from "./pages/Terminos.jsx";
 import NotFound from "./pages/NotFound.jsx";
+import ActualizarContrasena from "./components/ActualizarContrasena.jsx";
 
 export default function App() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Intercepta el token de recuperación y lo redirige limpiamente sin alterar el login
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        navigate("/actualizar-contrasena", { replace: true });
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [navigate]);
+
   return (
     <div className="flex min-h-screen flex-col bg-paper">
       <Navbar />
@@ -25,6 +43,7 @@ export default function App() {
           <Route path="/mi-perfil" element={<MiPerfil />} />
           <Route path="/editar-perfil" element={<EditarPerfil />} />
           <Route path="/admin-login" element={<AdminLogin />} />
+          <Route path="/actualizar-contrasena" element={<ActualizarContrasena />} />
           <Route path="/terminos" element={<Terminos />} />
           <Route
             path="/admin"
