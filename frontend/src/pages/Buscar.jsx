@@ -23,6 +23,186 @@ function capitalizarTexto(texto) {
   return limpio.charAt(0).toUpperCase() + limpio.slice(1).toLowerCase();
 }
 
+// Componente interno para manejar las reseñas con un modal perfectamente visible
+function SeccionResenas({ profesionalId, nombreProfesional }) {
+  const [resenas, setResenas] = useState([]);
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [mostrarModalTodas, setMostrarModalTodas] = useState(false);
+  const [nombreCliente, setNombreCliente] = useState("");
+  const [calificacion, setCalificacion] = useState(5);
+  const [comentario, setComentario] = useState("");
+  const [cargando, setCargando] = useState(false);
+
+  async function cargarResenas() {
+    try {
+      const { data, error } = await supabase
+        .from("resenas")
+        .select("*")
+        .eq("profesional_id", profesionalId)
+        .order("creado_en", { ascending: false });
+
+      if (!error && data) {
+        setResenas(data);
+      }
+    } catch (err) {
+      console.error("Error al cargar reseñas:", err);
+    }
+  }
+
+  useEffect(() => {
+    cargarResenas();
+  }, [profesionalId]);
+
+  async function handleSubmitResena(e) {
+    e.preventDefault();
+    if (!nombreCliente.trim()) {
+      alert("Por favor, ingresa tu nombre.");
+      return;
+    }
+
+    setCargando(true);
+    try {
+      const { error } = await supabase.from("resenas").insert([
+        {
+          profesional_id: profesionalId,
+          cliente_nombre: nombreCliente,
+          calificacion: parseInt(calificacion),
+          comentario: comentario,
+        },
+      ]);
+
+      if (error) throw error;
+
+      alert("¡Reseña enviada con éxito!");
+      setNombreCliente("");
+      setComentario("");
+      setCalificacion(5);
+      setMostrarForm(false);
+      cargarResenas(); 
+    } catch (err) {
+      alert("Error al enviar la reseña: " + err.message);
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  const promedio = resenas.length > 0
+    ? (resenas.reduce((acc, r) => acc + r.calificacion, 0) / resenas.length).toFixed(1)
+    : "Sin calificar";
+
+  return (
+    <div className="mt-3 pt-3 border-t border-stone/30">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1 text-xs font-bold text-amber-500">
+          <span>⭐</span>
+          <span>{promedio}</span>
+          <span className="text-stone-dark font-normal">({resenas.length} {resenas.length === 1 ? 'reseña' : 'reseñas'})</span>
+        </div>
+        <div className="flex gap-2">
+          {resenas.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setMostrarModalTodas(true)}
+              className="text-xs font-semibold text-stone-dark hover:underline cursor-pointer"
+            >
+              Ver opiniones ({resenas.length})
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setMostrarForm(!mostrarForm)}
+            className="text-xs font-semibold text-copper hover:underline cursor-pointer"
+          >
+            {mostrarForm ? "Cancelar" : "✍️ Calificar"}
+          </button>
+        </div>
+      </div>
+
+      {/* Formulario desplegable para dejar reseña */}
+      {mostrarForm && (
+        <form onSubmit={handleSubmitResena} className="mt-3 bg-stone/5 p-3 rounded-sm border border-stone/30 space-y-2">
+          <p className="text-xs font-bold text-ink">Dejanos tu opinión</p>
+          <div>
+            <input
+              type="text"
+              required
+              value={nombreCliente}
+              onChange={(e) => setNombreCliente(e.target.value)}
+              placeholder="Tu nombre"
+              className="w-full rounded-sm border border-stone bg-white px-2 py-1 text-xs text-ink focus:border-copper focus:outline-none"
+            />
+          </div>
+          <div>
+            <select
+              value={calificacion}
+              onChange={(e) => setCalificacion(e.target.value)}
+              className="w-full rounded-sm border border-stone bg-white px-2 py-1 text-xs text-ink focus:border-copper focus:outline-none"
+            >
+              <option value="5">⭐⭐⭐⭐⭐ (5 - Excelente)</option>
+              <option value="4">⭐⭐⭐⭐ (4 - Muy Bueno)</option>
+              <option value="3">⭐⭐⭐ (3 - Bueno)</option>
+              <option value="2">⭐⭐ (2 - Regular)</option>
+              <option value="1">⭐ (1 - Malo)</option>
+            </select>
+          </div>
+          <div>
+            <textarea
+              value={comentario}
+              onChange={(e) => setComentario(e.target.value)}
+              placeholder="Comentario opcional..."
+              rows="2"
+              className="w-full rounded-sm border border-stone bg-white px-2 py-1 text-xs text-ink focus:border-copper focus:outline-none"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={cargando}
+            className="w-full rounded-sm bg-copper py-1.5 text-xs font-bold text-paper hover:opacity-90 cursor-pointer disabled:opacity-50"
+          >
+            {cargando ? "Enviando..." : "Publicar reseña"}
+          </button>
+        </form>
+      )}
+
+      {/* Modal flotante protegido con z-[9999] para que nunca se oculte detrás del mapa */}
+      {mostrarModalTodas && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-2xl max-h-[85vh] flex flex-col border border-stone/40">
+            <div className="flex items-center justify-between border-b border-stone pb-3">
+              <div>
+                <h3 className="font-display font-bold text-ink text-base">Reseñas de {nombreProfesional}</h3>
+                <p className="text-xs text-ink/60">Promedio general: ⭐ {promedio} ({resenas.length} opiniones)</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarModalTodas(false)}
+                className="rounded-sm bg-stone/20 px-3 py-1.5 text-xs font-bold text-ink hover:bg-stone/30 cursor-pointer transition"
+              >
+                ✕ Cerrar
+              </button>
+            </div>
+
+            <div className="mt-4 flex-1 overflow-y-auto space-y-2.5 pr-1">
+              {resenas.map((r) => (
+                <div key={r.id} className="bg-stone/5 p-3 rounded-sm border border-stone/20 text-xs">
+                  <div className="flex justify-between font-bold text-ink">
+                    <span>{r.cliente_nombre}</span>
+                    <span className="text-amber-500">{"⭐".repeat(r.calificacion)}</span>
+                  </div>
+                  <span className="text-[10px] text-ink/40 block mt-0.5">
+                    {new Date(r.creado_en).toLocaleDateString()}
+                  </span>
+                  {r.comentario && <p className="text-ink/80 mt-1">{r.comentario}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Buscar() {
   const [paso, setPaso] = useState("rubros");
   const [ubicacionCliente, setUbicacionCliente] = useState(null);
@@ -100,24 +280,12 @@ export default function Buscar() {
 
   function procesarBusquedaInteligente(texto) {
     const textoMinuscula = texto.toLowerCase();
-    // Convertimos el texto en un array de palabras limpias para evaluar concordancias exactas de palabras
     const palabrasTexto = textoMinuscula.replace(/[^\w\sáéíóúñ]/gi, '').split(/\s+/);
     const idsEncontrados = [];
 
-    // Función auxiliar para verificar si alguna palabra clave coincide como palabra completa o frase exacta
-    function contieneTermino(termino) {
-      const termLower = termino.toLowerCase();
-      if (termLower.includes(' ')) {
-        return textoMinuscula.includes(termLower);
-      }
-      return palabrasTexto.includes(termLower);
-    }
-
-    // 0. BUSCAR PRIMERO EN EL DICCIONARIO DINÁMICO (EDUCADO DESDE EL ADMIN)
     sinonimosDinamicos.forEach(item => {
       if (item.palabra) {
         const palabraClave = item.palabra.toLowerCase().trim();
-        // Si la palabra clave tiene espacios o la palabra exacta está en el array
         const coincide = palabraClave.includes(' ') 
           ? textoMinuscula.includes(palabraClave) 
           : palabrasTexto.includes(palabraClave);
@@ -134,7 +302,6 @@ export default function Buscar() {
       return [...new Set(idsEncontrados)];
     }
 
-    // 1. DISEÑADOR / DISEÑO / GRÁFICA / 3D / VOLANTES
     const esBusquedaDeDiseno = 
       palabrasTexto.some(p => ["diseño", "diseñador", "diseñar", "flyer", "volante", "tarjeta", "logo", "cartel", "publicidad", "grafico", "3d"].includes(p)) ||
       textoMinuscula.includes("producto 3d");
@@ -142,10 +309,7 @@ export default function Buscar() {
     if (esBusquedaDeDiseno) {
       rubros.forEach(r => {
         const nombreR = r.nombre.toLowerCase();
-        if (
-          nombreR.includes("diseñ") || nombreR.includes("grafic") || 
-          nombreR.includes("publicidad")
-        ) {
+        if (nombreR.includes("diseñ") || nombreR.includes("grafic") || nombreR.includes("publicidad")) {
           if (!nombreR.includes("electrónica") && !nombreR.includes("electronica")) {
             idsEncontrados.push(r.id);
           }
@@ -153,7 +317,6 @@ export default function Buscar() {
       });
     }
 
-    // 2. ELECTRÓNICA / EQUIPOS DE MÚSICA / AUDIO / ESTÉREO / AMPLIFICADOR / TV / PANTALLA
     const esBusquedaDeElectronica = 
       palabrasTexto.some(p => ["electrónica", "electronica", "audio", "parlante", "musica", "música", "estéreo", "estereo", "amplificador", "tv", "tele", "televisor", "pantalla"].includes(p)) ||
       textoMinuscula.includes("equipo de música") || textoMinuscula.includes("equipo de musica");
@@ -167,7 +330,6 @@ export default function Buscar() {
       });
     }
 
-    // 3. INFORMÁTICA / COMPUTACIÓN / ACCESORIOS / MOUSE / EXCEL / OFIMÁTICA / PROGRAMACIÓN / WEB
     const esBusquedaDeInformatica = 
       palabrasTexto.some(p => ["computación", "computacion", "informática", "informatica", "computadora", "pc", "notebook", "ordenador", "laptop", "mouse", "teclado", "excel", "planilla", "ofimática", "ofimatica", "programa", "programar", "web", "app", "aplicación", "impresora", "wifi", "cpu"].includes(p)) ||
       textoMinuscula.includes("diseño web");
@@ -181,37 +343,31 @@ export default function Buscar() {
       });
     }
 
-    // 4. PLOMERÍA / PLOMERO
     if (palabrasTexto.some(p => ["plomero", "plomería", "plomeria", "canilla", "agua", "fuga", "pérdida", "perdida", "inodoro", "caño", "gotera"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("plom"));
       if (match) idsEncontrados.push(match.id);
     }
 
-    // 5. ELECTRICIDAD / ELECTRICISTA
     if (palabrasTexto.some(p => ["electricista", "electricidad", "luz", "cable", "corto", "enchufe", "foco", "térmica", "termica", "cortocircuito"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("electric"));
       if (match) idsEncontrados.push(match.id);
     }
 
-    // 6. ALBAÑILERÍA / ALBAÑIL
     if (palabrasTexto.some(p => ["albañil", "albanil", "albañilería", "albanileria", "pared", "humedad", "piso", "techo", "ladrillo", "construccion", "construcción"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("albañil") || r.nombre.toLowerCase().includes("albanil"));
       if (match) idsEncontrados.push(match.id);
     }
 
-    // 7. JARDINERÍA / JARDINERO / PARQUERO / PASTO
     if (palabrasTexto.some(p => ["jardin", "jardín", "jardinero", "parquero", "pasto", "césped", "cesped", "parquiza", "poda"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("jardin") || r.nombre.toLowerCase().includes("parquiza"));
       if (match) idsEncontrados.push(match.id);
     }
 
-    // 8. GASISTA / GAS
     if (palabrasTexto.some(p => ["gas", "gasista", "estufa", "calefón", "calefon", "termotanque", "cocina"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("gas"));
       if (match) idsEncontrados.push(match.id);
     }
 
-    // 9. PASTELERÍA / PASTELERO / DONAS / MINI DONAS / BUDÍN
     if (
       palabrasTexto.some(p => ["pastel", "pastelero", "pastelería", "pasteleria", "budín", "budin", "torta", "pan", "dulce", "postre", "repostería", "reposteria", "dona", "donas", "donna", "donnas", "donut", "donuts"].includes(p)) ||
       textoMinuscula.includes("mini dona") || textoMinuscula.includes("mini donas") || textoMinuscula.includes("minidona") || textoMinuscula.includes("minidonas")
@@ -223,25 +379,21 @@ export default function Buscar() {
       if (match) idsEncontrados.push(match.id);
     }
 
-    // 10. ESTILISTA / UÑAS / PESTAÑAS / BELLEZA
-    if (palabrasTexto.some(p => ["estilista", "uñas", "uñas", "pestaña", "pestañas", "peluquería", "peluqueria", "peluquero", "maquillaje", "belleza"].includes(p))) {
+    if (palabrasTexto.some(p => ["estilista", "uñas", "pestaña", "pestañas", "peluquería", "peluqueria", "peluquero", "maquillaje", "belleza"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("estilis") || r.nombre.toLowerCase().includes("peluquer") || r.nombre.toLowerCase().includes("belleza"));
       if (match) idsEncontrados.push(match.id);
     }
 
-    // 11. REFRIGERACIÓN / AIRE ACONDICIONADO / HELADERA / FREEZER
     if (palabrasTexto.some(p => ["refrigeración", "refrigeracion", "heladera", "freezer"].includes(p)) || textoMinuscula.includes("aire acondicionado")) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("refrigerac") || r.nombre.toLowerCase().includes("aire"));
       if (match) idsEncontrados.push(match.id);
     }
 
-    // 12. PINTURA / PINTOR
     if (palabrasTexto.some(p => ["pintor", "pintura", "pintar", "cielorraso"].includes(p))) {
       const match = rubros.find(r => r.nombre.toLowerCase().includes("pintor"));
       if (match) idsEncontrados.push(match.id);
     }
 
-    // 13. Búsqueda genérica por nombre de rubro directo
     if (idsEncontrados.length === 0) {
       rubros.forEach(r => {
         const nombreRubro = r.nombre.toLowerCase();
@@ -249,23 +401,6 @@ export default function Buscar() {
           idsEncontrados.push(r.id);
         }
       });
-    }
-
-    // 14. Búsqueda en descripciones de profesionales en Supabase
-    if (idsEncontrados.length === 0) {
-      const profesionalesQueCoinciden = profesionales.filter(p => {
-        const desc = (p.descripcion || "").toLowerCase();
-        const nombreProf = (p.nombre_completo || p.nombre || "").toLowerCase();
-        return palabrasTexto.some(p => p.length > 3 && (desc.includes(p) || nombreProf.includes(p)));
-      });
-
-      if (profesionalesQueCoinciden.length > 0) {
-        profesionalesQueCoinciden.forEach(p => {
-          p.profesional_rubros?.forEach(pr => {
-            if (pr.rubros?.id) idsEncontrados.push(pr.rubros.id);
-          });
-        });
-      }
     }
 
     return [...new Set(idsEncontrados)];
@@ -283,7 +418,7 @@ export default function Buscar() {
       setFiltroTextoLibreCoincidencia(textoLimpio.toLowerCase());
       ejecutarUbicacionYPasar();
     } else {
-      alert(`No encontramos profesionales ni rubros asociados a "${textoLimpio}". Por favor, revisá los botones de rubros que hay más abajo en la lista.`);
+      alert(`No encontramos profesionales ni rubros asociados a "${textoLimpio}". Por favor, revisá los botones de rubros.`);
     }
   }
 
@@ -312,7 +447,7 @@ export default function Buscar() {
         setFiltroTextoLibreCoincidencia(transcripcion.toLowerCase());
         ejecutarUbicacionYPasar();
       } else {
-        alert(`No encontramos un rubro o servicio directo para "${transcripcion}". Por favor, seleccioná un rubro de la lista de botones.`);
+        alert(`No encontramos un rubro directo para "${transcripcion}".`);
       }
     };
     recognition.onerror = () => setEscuchandoVoz(false);
@@ -444,14 +579,8 @@ export default function Buscar() {
             </button>
           </div>
 
-          <div className="h-[45vh] sm:h-[450px] w-full overflow-hidden rounded-lg border border-stone bg-white shadow-sm relative touch-pan-y">
+          <div className="h-[45vh] sm:h-[450px] w-full overflow-hidden rounded-lg border border-stone bg-white shadow-sm relative touch-pan-y z-0">
             <MapView profesionales={profesionalesFiltrados} centroCliente={ubicacionCliente} />
-          </div>
-
-          <div className="text-center py-1 sm:hidden">
-            <span className="text-[11px] text-stone-dark font-medium bg-stone/20 px-3 py-1 rounded-full">
-              👆 Deslizá hacia arriba para ver las fichas
-            </span>
           </div>
 
           <div className="pt-2">
@@ -464,8 +593,9 @@ export default function Buscar() {
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {profesionalesFiltrados.map((p, index) => {
+                  const nombreProf = p.nombre_completo || p.nombre;
                   const telWp = p.whatsapp || p.telefono || "";
-                  const mensajeWp = encodeURIComponent(`Hola ${p.nombre_completo || p.nombre}, te contacto desde ConectaOficios. Necesito tus servicios.`);
+                  const mensajeWp = encodeURIComponent(`Hola ${nombreProf}, te contacto desde ConectaOficios. Necesito tus servicios.`);
                   const linkWhatsapp = telWp ? `https://wa.me/${telWp.replace(/\D/g, '')}?text=${mensajeWp}` : "#";
 
                   return (
@@ -474,7 +604,7 @@ export default function Buscar() {
                         <span className="absolute top-4 right-4 rounded-full bg-copper/10 px-2.5 py-1 font-mono text-xs font-bold text-copper-dark">
                           #{index + 1} ({p.distanciaKm.toFixed(1)} km)
                         </span>
-                        <h3 className="font-display text-base sm:text-lg font-bold text-ink pr-16">{p.nombre_completo || p.nombre}</h3>
+                        <h3 className="font-display text-base sm:text-lg font-bold text-ink pr-16">{nombreProf}</h3>
                         <p className="text-xs uppercase tracking-wide text-stone-dark font-medium mt-0.5">
                           {p.direccion}, {p.localidad || "Unquillo"}
                         </p>
@@ -485,6 +615,9 @@ export default function Buscar() {
                           </p>
                         )}
                       </div>
+
+                      {/* Sección de Reseñas y Estrellas con modal garantizado por encima del mapa */}
+                      <SeccionResenas profesionalId={p.id} nombreProfesional={nombreProf} />
 
                       <div className="mt-4 pt-3 border-t border-stone/40">
                         <p className="text-xs text-ink/70 mb-2">WhatsApp: <strong>{telWp || "No especificado"}</strong></p>
