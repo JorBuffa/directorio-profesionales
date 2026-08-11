@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import InstalarAppModal from "../components/InstalarAppModal.jsx";
 
 const categorias = [
   { nombre: "Electricista", medida: "220V" },
@@ -11,7 +12,7 @@ const categorias = [
 
 export default function Home() {
   return (
-    <div className="bg-paper min-h-screen">
+    <div className="bg-paper min-h-screen relative">
       {/* HERO: Sección principal rediseñada con alto impacto y botones gigantes */}
       <section className="bg-blueprint px-4 py-16 md:py-24 text-paper text-center md:text-left border-b-4 border-copper">
         <div className="mx-auto max-w-5xl grid gap-10 md:grid-cols-2 items-center">
@@ -121,6 +122,9 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* Botón flotante para instalar la aplicación */}
+      <InstalarAppModal />
     </div>
   );
 }
