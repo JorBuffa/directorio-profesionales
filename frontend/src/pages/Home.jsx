@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import InstalarAppModal from "../components/InstalarAppModal.jsx";
 
 const categorias = [
   { nombre: "Electricista", medida: "220V" },
@@ -14,14 +13,7 @@ export default function Home() {
   return (
     <div className="bg-paper min-h-screen">
       
-      {/* BARRA SUPERIOR LIMPIA: Solo muestra el botón de instalación a la derecha */}
-      <header className="bg-blueprint border-b border-copper/30 px-4 py-3">
-        <div className="mx-auto max-w-5xl flex items-center justify-end">
-          <InstalarAppModal />
-        </div>
-      </header>
-
-      {/* HERO: Sección principal rediseñada con alto impacto y botones gigantes */}
+      {/* HERO: Sección principal con los botones gigantes y centrales */}
       <section className="bg-blueprint px-4 py-16 md:py-24 text-paper text-center md:text-left border-b-4 border-copper">
         <div className="mx-auto max-w-5xl grid gap-10 md:grid-cols-2 items-center">
           
@@ -38,7 +30,7 @@ export default function Home() {
               Conectamos vecinos con electricistas, plomeros, albañiles y más de forma rápida, directa y segura. Con mapa en vivo y datos verificados.
             </p>
 
-            {/* BOTONES GIGANTES Y DESTACADOS PARA FÁCIL ACCESO */}
+            {/* BOTONES GIGANTES Y DESTACADOS PARA FÁCIL ACCESO EN EL CENTRO */}
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
               <Link
                 to="/buscar"
@@ -58,7 +50,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Gráfico o ilustración visual lateral simplificada */}
+          {/* Gráfico o ilustración visual lateral */}
           <div className="hidden md:flex justify-center bg-white/5 p-8 rounded-2xl border border-white/10 shadow-inner">
             <svg viewBox="0 0 360 280" className="w-full max-w-xs drop-shadow-md">
               <circle cx="90" cy="200" r="10" fill="#E28E52" />
@@ -87,7 +79,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECCIÓN DE PASOS MUY CLARA */}
+      {/* SECCIÓN DE PASOS */}
       <section className="bg-stone/20 py-12 border-b border-stone">
         <div className="mx-auto max-w-5xl px-4">
           <h2 className="text-center font-display text-2xl font-bold text-ink mb-8">
