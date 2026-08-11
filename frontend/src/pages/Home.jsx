@@ -12,7 +12,15 @@ const categorias = [
 
 export default function Home() {
   return (
-    <div className="bg-paper min-h-screen relative">
+    <div className="bg-paper min-h-screen">
+      
+      {/* BARRA SUPERIOR LIMPIA: Solo muestra el botón de instalación a la derecha */}
+      <header className="bg-blueprint border-b border-copper/30 px-4 py-3">
+        <div className="mx-auto max-w-5xl flex items-center justify-end">
+          <InstalarAppModal />
+        </div>
+      </header>
+
       {/* HERO: Sección principal rediseñada con alto impacto y botones gigantes */}
       <section className="bg-blueprint px-4 py-16 md:py-24 text-paper text-center md:text-left border-b-4 border-copper">
         <div className="mx-auto max-w-5xl grid gap-10 md:grid-cols-2 items-center">
@@ -122,9 +130,6 @@ export default function Home() {
           ))}
         </div>
       </section>
-
-      {/* Botón flotante para instalar la aplicación */}
-      <InstalarAppModal />
     </div>
   );
 }
