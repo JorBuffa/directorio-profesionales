@@ -21,33 +21,58 @@ export default function AsistenteIA() {
     scrollToBottom();
   }, [messages, isOpen]);
 
-  // Función para forzar voz masculina en español
+  // Función para limpiar asteriscos y formato markdown antes de leer por voz
+  const cleanTextForSpeech = (text) => {
+    return text
+      .replace(/[*_#`~>-]/g, ' ') // Remueve asteriscos, numerales, guiones, etc.
+      .replace(/\s+/g, ' ')        // Normaliza espacios múltiples
+      .trim();
+  };
+
+  // Función para forzar voz masculina en español de manera robusta
   const speakText = (text) => {
     if (!('speechSynthesis' in window)) return;
     
     window.speechSynthesis.cancel();
     
-    const utterance = new SpeechSynthesisUtterance(text);
+    const plainText = cleanTextForSpeech(text);
+    const utterance = new SpeechSynthesisUtterance(plainText);
     utterance.lang = 'es-AR';
     utterance.rate = 1.05;
 
     const setVoiceAndSpeak = () => {
       const voices = window.speechSynthesis.getVoices();
-      const spanishVoices = voices.filter(v => v.lang.startsWith('es'));
+      const spanishVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('es'));
       
-      const maleVoice = spanishVoices.find(v => 
-        v.name.toLowerCase().includes('male') || 
-        v.name.toLowerCase().includes('pablo') || 
-        v.name.toLowerCase().includes('mateo') ||
-        v.name.toLowerCase().includes('diego') ||
-        v.name.toLowerCase().includes('raul') ||
-        v.name.toLowerCase().includes('david')
-      );
+      // Buscar nombres masculinos comunes en motores de voz de Android/iOS/Windows
+      const maleVoice = spanishVoices.find(v => {
+        const name = v.name.toLowerCase();
+        return (
+          name.includes('male') || 
+          name.includes('pablo') || 
+          name.includes('mateo') ||
+          name.includes('diego') ||
+          name.includes('raul') ||
+          name.includes('david') ||
+          name.includes('carlos') ||
+          name.includes('alvaro') ||
+          name.includes('jorge')
+        );
+      });
 
       if (maleVoice) {
         utterance.voice = maleVoice;
       } else if (spanishVoices.length > 0) {
-        const fallbackMale = spanishVoices.find(v => !v.name.toLowerCase().includes('female') && !v.name.toLowerCase().includes('helena') && !v.name.toLowerCase().includes('laura'));
+        // Fallback: evitar voces explícitamente femeninas conocidas
+        const fallbackMale = spanishVoices.find(v => {
+          const name = v.name.toLowerCase();
+          return !name.includes('female') && 
+                 !name.includes('helena') && 
+                 !name.includes('laura') && 
+                 !name.includes('sabina') && 
+                 !name.includes('monica') && 
+                 !name.includes('paula');
+        });
         if (fallbackMale) utterance.voice = fallbackMale;
       }
 
@@ -86,7 +111,7 @@ export default function AsistenteIA() {
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.6-flash',
+        model: 'gemini-2.5-flash',
         contents: [
           {
             role: 'user',
