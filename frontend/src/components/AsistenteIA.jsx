@@ -21,13 +21,19 @@ export default function AsistenteIA() {
     scrollToBottom();
   }, [messages, isOpen]);
 
-  // Función para forzar voz masculina en español
+  // Función para limpiar asteriscos y formato de la IA
+  const cleanTextForDisplay = (text) => {
+    return text.replace(/[*_#`]/g, ''); // Elimina asteriscos, guiones bajos, michis y comillas de código
+  };
+
+  // Función de voz con síntesis del navegador
   const speakText = (text) => {
     if (!('speechSynthesis' in window)) return;
     
     window.speechSynthesis.cancel();
+    const cleanSpeech = cleanTextForDisplay(text);
     
-    const utterance = new SpeechSynthesisUtterance(text);
+    const utterance = new SpeechSynthesisUtterance(cleanSpeech);
     utterance.lang = 'es-AR';
     utterance.rate = 1.05;
 
@@ -47,7 +53,11 @@ export default function AsistenteIA() {
       if (maleVoice) {
         utterance.voice = maleVoice;
       } else if (spanishVoices.length > 0) {
-        const fallbackMale = spanishVoices.find(v => !v.name.toLowerCase().includes('female') && !v.name.toLowerCase().includes('helena') && !v.name.toLowerCase().includes('laura'));
+        const fallbackMale = spanishVoices.find(v => 
+          !v.name.toLowerCase().includes('female') && 
+          !v.name.toLowerCase().includes('helena') && 
+          !v.name.toLowerCase().includes('laura')
+        );
         if (fallbackMale) utterance.voice = fallbackMale;
       }
 
@@ -93,10 +103,11 @@ export default function AsistenteIA() {
             parts: [
               {
                 text: `Actúa como el asistente virtual experto de "Conecta Oficios". 
-                Cuando un usuario reporte un problema, falla o emergencia (ya sea de electricidad, plomería/pérdidas de agua, gas, computación/notebooks/PCs, vehículos/autos/motos, cerrajería o refrigeración), tu rol es:
-                1. Brindar inmediatamente pautas, consejos de seguridad y pasos de emergencia claros, cortos y ordenados para realizar mientras espera al especialista.
-                2. Mantener un tono tranquilo, amable, empático y conciso.
-                3. Al finalizar, recordar cordialmente que para una solución definitiva o profesional puede buscar y contratar un especialista verificado (electricista, plomero, gasista, técnico informático, mecánico, cerrajero, etc.) directamente en la plataforma.
+                Cuando un usuario reporte un problema, falla o emergencia (electricidad, plomería, gas, computación, vehículos, cerrajería, refrigeración):
+                1. Brinda pautas, consejos de seguridad y pasos de emergencia cortos y ordenados.
+                2. Mantén un tono tranquilo, amable, empático y conciso.
+                3. NO uses asteriscos ni símbolos de formato complejos en tu respuesta para que sea fácil de leer en pantallas de chat.
+                4. Al final, recuerda que para una solución definitiva puede contratar un especialista verificado en la plataforma.
                 
                 Mensaje del usuario: "${userMessage}"`
               }
@@ -105,12 +116,14 @@ export default function AsistenteIA() {
         ]
       });
 
-      const replyText = response.text || 'Lo siento, no pude procesar tu consulta.';
+      const rawReply = response.text || 'Lo siento, no pude procesar tu consulta.';
+      const replyText = cleanTextForDisplay(rawReply);
+
       setMessages((prev) => [...prev, { role: 'model', text: replyText }]);
-      
       speakText(replyText);
       
     } catch (error) {
+      console.error("Error en IA:", error);
       setMessages((prev) => [...prev, { role: 'model', text: 'Error de conexión. Intenta más tarde.' }]);
     } finally {
       setLoading(false);
@@ -146,7 +159,7 @@ export default function AsistenteIA() {
             <button type="button" onClick={handleListen} style={{ backgroundColor: isListening ? '#dc2626' : '#f3f4f6', color: isListening ? 'white' : '#374151', border: '1px solid #d1d5db', borderRadius: '6px', padding: '8px 10px', cursor: 'pointer', fontSize: '14px' }}>
               {isListening ? '🔴' : '🎤'}
             </button>
-            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Escribe o habla..." style={{ flex: 1, padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none', fontSize: '14px' }} />
+            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Escribe o habla..." style={{ flex: '1', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', outline: 'none', fontSize: '14px' }} />
             <button type="submit" disabled={loading} style={{ backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', padding: '8px 12px', cursor: 'pointer', fontWeight: 'bold' }}>Enviar</button>
           </form>
         </div>
