@@ -4,7 +4,7 @@ import { supabase } from "./api/supabaseClient";
 import Navbar from "./components/Navbar.jsx";
 import Footer from "./components/Footer.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
-import AsistenteIA from './components/AsistenteIA';
+import AsistenteIA from "./components/AsistenteIA.jsx";
 
 import Home from "./pages/Home.jsx";
 import Buscar from "./pages/Buscar.jsx";
