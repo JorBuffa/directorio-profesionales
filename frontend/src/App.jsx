@@ -4,6 +4,7 @@ import { supabase } from "./api/supabaseClient";
 import Navbar from "./components/Navbar.jsx";
 import Footer from "./components/Footer.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import AsistenteIA from './components/AsistenteIA';
 
 import Home from "./pages/Home.jsx";
 import Buscar from "./pages/Buscar.jsx";
@@ -57,6 +58,8 @@ export default function App() {
         </Routes>
       </main>
       <Footer />
+      {/* Componente del Asistente IA Flotante */}
+      <AsistenteIA />
     </div>
   );
 }
